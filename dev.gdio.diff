@@ -1,0 +1,2279 @@
+diff --git a/incubator/aws-alb-ingress-controller/Chart.yaml b/incubator/aws-alb-ingress-controller/Chart.yaml
+index c27e7b047..e0acc64b8 100644
+--- ./incubator/aws-alb-ingress-controller/Chart.yaml
++++ ./incubator/aws-alb-ingress-controller/Chart.yaml
+@@ -1,8 +1,8 @@
+ apiVersion: v1
+ name: aws-alb-ingress-controller
+ description: A Helm chart for AWS ALB Ingress Controller
+-version: 0.1.12
+-appVersion: "v1.1.4"
++version: 0.1.13
++appVersion: "v1.1.5"
+ engine: gotpl
+ home: https://github.com/kubernetes-sigs/aws-alb-ingress-controller
+ sources:
+diff --git a/incubator/aws-alb-ingress-controller/README.md b/incubator/aws-alb-ingress-controller/README.md
+index 6276223fe..fb0564da3 100644
+--- ./incubator/aws-alb-ingress-controller/README.md
++++ ./incubator/aws-alb-ingress-controller/README.md
+@@ -54,7 +54,7 @@ The following tables lists the configurable parameters of the alb-ingress-contro
+ | `awsVpcID`                | AWS VPC ID of k8s cluster, required if ec2metadata is unavailable from controller pod                          | `vpc-xxx`                                                                 |
+ | `autoDiscoverAwsVpcID`    | auto discover awsVpcID from ec2metadata, omit awsRegion when this set to true                                  | false                                                                     |
+ | `image.repository`        | controller container image repository                                                                          | `894847497797.dkr.ecr.us-west-2.amazonaws.com/aws-alb-ingress-controller` |
+-| `image.tag`               | controller container image tag                                                                                 | `v1.1.4`                                                                  |
++| `image.tag`               | controller container image tag                                                                                 | `v1.1.5`                                                                  |
+ | `image.pullPolicy`        | controller container image pull policy                                                                         | `IfNotPresent`                                                            |
+ | `enableReadinessProbe`    | enable readinessProbe on controller pod                                                                      | `false`                                                                    |
+ | `enableLivenessProbe`     | enable livenessProbe on controller pod                                                                         | `false`                                                                   |
+diff --git a/incubator/aws-alb-ingress-controller/values.yaml b/incubator/aws-alb-ingress-controller/values.yaml
+index df55767a5..1df684fd4 100644
+--- ./incubator/aws-alb-ingress-controller/values.yaml
++++ ./incubator/aws-alb-ingress-controller/values.yaml
+@@ -76,7 +76,7 @@ rbac:
+ 
+ image:
+   repository: docker.io/amazon/aws-alb-ingress-controller
+-  tag: "v1.1.4"
++  tag: "v1.1.5"
+   pullPolicy: IfNotPresent
+ 
+ replicaCount: 1
+diff --git a/stable/chartmuseum/Chart.yaml b/stable/chartmuseum/Chart.yaml
+index 60d8a3a42..2e5ba6874 100644
+--- ./stable/chartmuseum/Chart.yaml
++++ ./stable/chartmuseum/Chart.yaml
+@@ -1,7 +1,7 @@
+ apiVersion: v1
+ description: Host your own Helm Chart Repository
+ name: chartmuseum
+-version: 2.7.0
++version: 2.7.1
+ appVersion: 0.11.0
+ home: https://github.com/helm/chartmuseum
+ icon: https://raw.githubusercontent.com/helm/chartmuseum/master/logo2.png
+diff --git a/stable/cluster-autoscaler/Chart.yaml b/stable/cluster-autoscaler/Chart.yaml
+index b549c9d01..51f17884e 100644
+--- ./stable/cluster-autoscaler/Chart.yaml
++++ ./stable/cluster-autoscaler/Chart.yaml
+@@ -2,7 +2,7 @@ apiVersion: v1
+ description: Scales worker nodes within autoscaling groups.
+ icon: https://github.com/kubernetes/kubernetes/blob/master/logo/logo.png
+ name: cluster-autoscaler
+-version: 6.2.0
++version: 6.3.0
+ appVersion: 1.14.6
+ home: https://github.com/kubernetes/autoscaler
+ sources:
+diff --git a/stable/cluster-autoscaler/README.md b/stable/cluster-autoscaler/README.md
+index e2f665767..794e4ea0d 100644
+--- ./stable/cluster-autoscaler/README.md
++++ ./stable/cluster-autoscaler/README.md
+@@ -173,6 +173,8 @@ Parameter | Description | Default
+ `replicaCount` | desired number of pods | `1`
+ `priorityClassName` | priorityClassName | `nil`
+ `dnsPolicy` | dnsPolicy | `nil`
++`securityContext` | [Security context for pod](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) | `nil`
++`containerSecurityContext` | [Security context for container](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) | `nil`
+ `resources` | pod resource requests & limits | `{}`
+ `service.annotations` | annotations to add to service | none
+ `service.externalIPs` | service external IP addresses | `[]`
+diff --git a/stable/cluster-autoscaler/templates/deployment.yaml b/stable/cluster-autoscaler/templates/deployment.yaml
+index 2eb5cc813..484555cf4 100644
+--- ./stable/cluster-autoscaler/templates/deployment.yaml
++++ ./stable/cluster-autoscaler/templates/deployment.yaml
+@@ -169,6 +169,10 @@ spec:
+             - containerPort: 8085
+           resources:
+ {{ toYaml .Values.resources | indent 12 }}
++          {{- if .Values.containerSecurityContext }}
++          securityContext:
++            {{ toYaml .Values.containerSecurityContext | nindent 12 | trim }}
++          {{- end }}
+           {{- if eq .Values.cloudProvider "gce" }}
+           volumeMounts:
+             - name: cloudconfig
+@@ -186,6 +190,10 @@ spec:
+       serviceAccountName: {{ if .Values.rbac.create }}{{ template "cluster-autoscaler.fullname" . }}{{ else }}"{{ .Values.rbac.serviceAccountName }}"{{ end }}
+       tolerations:
+ {{ toYaml .Values.tolerations | indent 8 }}
++      {{- if .Values.securityContext }}
++      securityContext:
++        {{ toYaml .Values.securityContext | nindent 8 | trim }}
++      {{- end }}
+       {{- if eq .Values.cloudProvider "gce" }}
+       volumes:
+         - name: cloudconfig
+diff --git a/stable/cluster-autoscaler/values.yaml b/stable/cluster-autoscaler/values.yaml
+index 59f96a758..5836bea22 100644
+--- ./stable/cluster-autoscaler/values.yaml
++++ ./stable/cluster-autoscaler/values.yaml
+@@ -133,6 +133,20 @@ priorityClassName: ""
+ # autoscaler does not depend on cluster DNS, recommended to set this to "Default"
+ # dnsPolicy: "Default"
+ 
++## Security context for pod
++## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
++# securityContext:
++#   runAsNonRoot: true
++#   runAsUser: 1001
++#   runAsGroup: 1001
++
++## Security context for container
++## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
++# containerSecurityContext:
++#   capabilities:
++#     drop:
++#       - all
++
+ service:
+   annotations: {}
+ 
+diff --git a/stable/coredns/Chart.yaml b/stable/coredns/Chart.yaml
+index 6666e4d87..c54883350 100644
+--- ./stable/coredns/Chart.yaml
++++ ./stable/coredns/Chart.yaml
+@@ -1,7 +1,7 @@
+ apiVersion: v1
+ name: coredns
+-version: 1.8.5
+-appVersion: 1.6.6
++version: 1.9.1
++appVersion: 1.6.7
+ description: CoreDNS is a DNS server that chains plugins and provides Kubernetes DNS Services
+ keywords:
+ - coredns
+diff --git a/stable/coredns/README.md b/stable/coredns/README.md
+index e0813bb95..9e0781571 100644
+--- ./stable/coredns/README.md
++++ ./stable/coredns/README.md
+@@ -47,7 +47,7 @@ The command removes all the Kubernetes components associated with the chart and
+ | Parameter                               | Description                                                                           | Default                                                     |
+ |:----------------------------------------|:--------------------------------------------------------------------------------------|:------------------------------------------------------------|
+ | `image.repository`                      | The image repository to pull from                                                     | coredns/coredns                                             |
+-| `image.tag`                             | The image tag to pull from                                                            | `v1.6.6`                                                    |
++| `image.tag`                             | The image tag to pull from                                                            | `v1.6.7`                                                    |
+ | `image.pullPolicy`                      | Image pull policy                                                                     | IfNotPresent                                                |
+ | `replicaCount`                          | Number of replicas                                                                    | 1                                                           |
+ | `resources.limits.cpu`                  | Container maximum CPU                                                                 | `100m`                                                      |
+@@ -67,14 +67,29 @@ The command removes all the Kubernetes components associated with the chart and
+ | `rbac.create`                           | If true, create & use RBAC resources                                                  | true                                                        |
+ | `rbac.pspEnable`                        | Specifies whether a PodSecurityPolicy should be created.                              | `false`                                                     |
+ | `isClusterService`                      | Specifies whether chart should be deployed as cluster-service or normal k8s app.      | true                                                        |
+-| `priorityClassName`                     | Name of Priority Class to assign pods                                                 | `nil`                                                       |
++| `priorityClassName`                     | Name of Priority Class to assign pods                                                 | `""`                                                        |
+ | `servers`                               | Configuration for CoreDNS and plugins                                                 | See values.yml                                              |
+ | `affinity`                              | Affinity settings for pod assignment                                                  | {}                                                          |
+ | `nodeSelector`                          | Node labels for pod assignment                                                        | {}                                                          |
+ | `tolerations`                           | Tolerations for pod assignment                                                        | []                                                          |
+ | `zoneFiles`                             | Configure custom Zone files                                                           | []                                                          |
+ | `extraSecrets`                          | Optional array of secrets to mount inside the CoreDNS container                       | []                                                          |
+-| `customLabels`			  | Optional labels for Deployment, Pod, Service, ServiceMonitor objects		  | {}								|
++| `customLabels`                          | Optional labels for Deployment(s), Pod, Service, ServiceMonitor objects               | {}                                                          |
++| `autoscaler.enabled`                    | Optionally enabled a cluster-proportional-autoscaler for CoreDNS                      | `false`                                                     |
++| `autoscaler.coresPerReplica`            | Number of cores in the cluster per CoreDNS replica                                    | `256`                                                       |
++| `autoscaler.nodesPerReplica`            | Number of nodes in the cluster per CoreDNS replica                                    | `16`                                                        |
++| `autoscaler.image.repository`           | The image repository to pull autoscaler from                                          | k8s.gcr.io/cluster-proportional-autoscaler-amd64            |
++| `autoscaler.image.tag`                  | The image tag to pull autoscaler from                                                 | `1.7.1`                                                     |
++| `autoscaler.image.pullPolicy`           | Image pull policy for the autoscaler                                                  | IfNotPresent                                                |
++| `autoscaler.priorityClassName`          | Optional priority class for the autoscaler pod. `priorityClassName` used if not set.  | `""`                                                        |
++| `autoscaler.affinity`                   | Affinity settings for pod assignment for autoscaler                                   | {}                                                          |
++| `autoscaler.nodeSelector`               | Node labels for pod assignment for autoscaler                                         | {}                                                          |
++| `autoscaler.tolerations`                | Tolerations for pod assignment for autoscaler                                         | []                                                          |
++| `autoscaler.resources.limits.cpu`       | Container maximum CPU for cluster-proportional-autoscaler                             | `20m`                                                       |
++| `autoscaler.resources.limits.memory`    | Container maximum memory for cluster-proportional-autoscaler                          | `10Mi`                                                      |
++| `autoscaler.resources.requests.cpu`     | Container requested CPU for cluster-proportional-autoscaler                           | `20m`                                                       |
++| `autoscaler.resources.requests.memory`  | Container requested memory for cluster-proportional-autoscaler                        | `10Mi`                                                      |
++
+ See `values.yaml` for configuration notes. Specify each parameter using the `--set key=value[,key=value]` argument to `helm install`. For example,
+ 
+ ```console
+@@ -104,3 +119,18 @@ create external loadbalancers with both "TCP" and "UDP" protocols. So
+ When deploying CoreDNS with `serviceType="LoadBalancer"` on such cloud
+ environments, make sure you do not attempt to use both protocols at the same
+ time.
++
++## Autoscaling
++
++By setting `autoscaler.enabled = true` a
++[cluster-proportional-autoscaler](https://github.com/kubernetes-incubator/cluster-proportional-autoscaler)
++will be deployed. This will default to a coredns replica for every 256 cores, or
++16 nodes in the cluster. These can be changed with `autoscaler.coresPerReplica`
++and `autoscaler.nodesPerReplica`. When cluster is using large nodes (with more
++cores), `coresPerReplica` should dominate. If using small nodes,
++`nodesPerReplica` should dominate.
++
++This also creates a ServiceAccount, ClusterRole, and ClusterRoleBinding for
++the autoscaler deployment.
++
++`replicaCount` is ignored if this is enabled.
+diff --git a/stable/coredns/templates/clusterrole-autoscaler.yaml b/stable/coredns/templates/clusterrole-autoscaler.yaml
+new file mode 100644
+index 000000000..748c62bf7
+--- /dev/null
++++ ./stable/coredns/templates/clusterrole-autoscaler.yaml
+@@ -0,0 +1,35 @@
++{{- if and .Values.autoscaler.enabled .Values.rbac.create }}
++---
++apiVersion: rbac.authorization.k8s.io/v1
++kind: ClusterRole
++metadata:
++  name: {{ template "coredns.fullname" . }}-autoscaler
++  labels:
++    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
++    app.kubernetes.io/instance: {{ .Release.Name | quote }}
++    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
++    {{- if .Values.isClusterService }}
++    k8s-app: {{ .Chart.Name }}-autoscaler
++    kubernetes.io/cluster-service: "true"
++    kubernetes.io/name: "CoreDNS"
++    {{- end }}
++    app.kubernetes.io/name: {{ template "coredns.name" . }}-autoscaler
++{{- if .Values.customLabels }}
++{{ toYaml .Values.customLabels | indent 4 }}
++{{- end }}
++rules:
++  - apiGroups: [""]
++    resources: ["nodes"]
++    verbs: ["list","watch"]
++  - apiGroups: [""]
++    resources: ["replicationcontrollers/scale"]
++    verbs: ["get", "update"]
++  - apiGroups: ["extensions", "apps"]
++    resources: ["deployments/scale", "replicasets/scale"]
++    verbs: ["get", "update"]
++# Remove the configmaps rule once below issue is fixed:
++# kubernetes-incubator/cluster-proportional-autoscaler#16
++  - apiGroups: [""]
++    resources: ["configmaps"]
++    verbs: ["get", "create"]
++{{- end }}
+diff --git a/stable/coredns/templates/clusterrolebinding-autoscaler.yaml b/stable/coredns/templates/clusterrolebinding-autoscaler.yaml
+new file mode 100644
+index 000000000..eafb38f9e
+--- /dev/null
++++ ./stable/coredns/templates/clusterrolebinding-autoscaler.yaml
+@@ -0,0 +1,28 @@
++{{- if and .Values.autoscaler.enabled .Values.rbac.create }}
++---
++apiVersion: rbac.authorization.k8s.io/v1
++kind: ClusterRoleBinding
++metadata:
++  name: {{ template "coredns.fullname" . }}-autoscaler
++  labels:
++    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
++    app.kubernetes.io/instance: {{ .Release.Name | quote }}
++    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
++    {{- if .Values.isClusterService }}
++    k8s-app: {{ .Chart.Name }}-autoscaler
++    kubernetes.io/cluster-service: "true"
++    kubernetes.io/name: "CoreDNS"
++    {{- end }}
++    app.kubernetes.io/name: {{ template "coredns.name" . }}-autoscaler
++{{- if .Values.customLabels }}
++{{ toYaml .Values.customLabels | indent 4 }}
++{{- end }}
++roleRef:
++  apiGroup: rbac.authorization.k8s.io
++  kind: ClusterRole
++  name: {{ template "coredns.fullname" . }}-autoscaler
++subjects:
++- kind: ServiceAccount
++  name: {{ template "coredns.fullname" . }}-autoscaler
++  namespace: {{ .Release.Namespace }}
++{{- end }}
+diff --git a/stable/coredns/templates/configmap-autoscaler.yaml b/stable/coredns/templates/configmap-autoscaler.yaml
+new file mode 100644
+index 000000000..f03cc2a8a
+--- /dev/null
++++ ./stable/coredns/templates/configmap-autoscaler.yaml
+@@ -0,0 +1,30 @@
++{{- if .Values.autoscaler.enabled }}
++---
++kind: ConfigMap
++apiVersion: v1
++metadata:
++  name: {{ template "coredns.fullname" . }}-autoscaler
++  namespace:  {{ .Release.Namespace }}
++  labels:
++    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
++    app.kubernetes.io/instance: {{ .Release.Name | quote }}
++    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
++    {{- if .Values.isClusterService }}
++    k8s-app: {{ .Chart.Name }}-autoscaler
++    kubernetes.io/cluster-service: "true"
++    kubernetes.io/name: "CoreDNS"
++    {{- end }}
++    app.kubernetes.io/name: {{ template "coredns.name" . }}-autoscaler
++{{- if .Values.customLabels }}
++{{ toYaml .Values.customLabels | indent 4 }}
++{{- end }}
++data:
++  # When cluster is using large nodes(with more cores), "coresPerReplica" should dominate.
++  # If using small nodes, "nodesPerReplica" should dominate.
++  linear: |-
++    {
++      "coresPerReplica": {{ .Values.autoscaler.coresPerReplica | float64 }},
++      "nodesPerReplica": {{ .Values.autoscaler.nodesPerReplica | float64 }},
++      "preventSinglePointFailure": true
++    }
++{{- end }}
+diff --git a/stable/coredns/templates/deployment-autoscaler.yaml b/stable/coredns/templates/deployment-autoscaler.yaml
+new file mode 100644
+index 000000000..8ecafb694
+--- /dev/null
++++ ./stable/coredns/templates/deployment-autoscaler.yaml
+@@ -0,0 +1,76 @@
++{{- if .Values.autoscaler.enabled }}
++---
++apiVersion: apps/v1
++kind: Deployment
++metadata:
++  name: {{ template "coredns.fullname" . }}-autoscaler
++  namespace: {{ .Release.Namespace }}
++  labels:
++    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
++    app.kubernetes.io/instance: {{ .Release.Name | quote }}
++    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
++    {{- if .Values.isClusterService }}
++    k8s-app: {{ .Chart.Name }}-autoscaler
++    kubernetes.io/cluster-service: "true"
++    kubernetes.io/name: "CoreDNS"
++    {{- end }}
++    app.kubernetes.io/name: {{ template "coredns.name" . }}-autoscaler
++{{- if .Values.customLabels }}
++{{ toYaml .Values.customLabels | indent 4 }}
++{{- end }}
++spec:
++  selector:
++    matchLabels:
++      app.kubernetes.io/instance: {{ .Release.Name | quote }}
++      {{- if .Values.isClusterService }}
++      k8s-app: {{ .Chart.Name }}-autoscaler
++      {{- end }}
++      app.kubernetes.io/name: {{ template "coredns.name" . }}-autoscaler
++  template:
++    metadata:
++      labels:
++        {{- if .Values.isClusterService }}
++        k8s-app: {{ .Chart.Name }}-autoscaler
++        {{- end }}
++        app.kubernetes.io/name: {{ template "coredns.name" . }}-autoscaler
++        app.kubernetes.io/instance: {{ .Release.Name | quote }}
++        {{- if .Values.customLabels }}
++        {{ toYaml .Values.customLabels | nindent 8 }}
++        {{- end }}
++      annotations:
++        {{- if .Values.isClusterService }}
++        scheduler.alpha.kubernetes.io/critical-pod: ''
++        scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
++        {{- end }}
++    spec:
++      serviceAccountName: {{ template "coredns.fullname" . }}-autoscaler
++      {{- $priorityClassName := default .Values.priorityClassName .Values.autoscaler.priorityClassName }}
++      {{- if $priorityClassName }}
++      priorityClassName: {{ $priorityClassName | quote }}
++      {{- end }}
++      {{- if .Values.autoscaler.affinity }}
++      affinity:
++{{ toYaml .Values.autoscaler.affinity | indent 8 }}
++      {{- end }}
++      {{- if .Values.autoscaler.tolerations }}
++      tolerations:
++{{ toYaml .Values.autoscaler.tolerations | indent 8 }}
++      {{- end }}
++      {{- if .Values.autoscaler.nodeSelector }}
++      nodeSelector:
++{{ toYaml .Values.autoscaler.nodeSelector | indent 8 }}
++      {{- end }}
++      containers:
++      - name: autoscaler
++        image: "{{ .Values.autoscaler.image.repository }}:{{ .Values.autoscaler.image.tag }}"
++        imagePullPolicy: {{ .Values.autoscaler.image.pullPolicy }}
++        resources:
++{{ toYaml .Values.autoscaler.resources | indent 10 }}
++        command:
++          - /cluster-proportional-autoscaler
++          - --namespace={{ .Release.Namespace }}
++          - --configmap={{ template "coredns.fullname" . }}-autoscaler
++          - --target=Deployment/{{ template "coredns.fullname" . }}
++          - --logtostderr=true
++          - --v=2
++{{- end }}
+diff --git a/stable/coredns/templates/deployment.yaml b/stable/coredns/templates/deployment.yaml
+index f61c9e31d..11db35a0f 100644
+--- ./stable/coredns/templates/deployment.yaml
++++ ./stable/coredns/templates/deployment.yaml
+@@ -16,7 +16,14 @@ metadata:
+ {{ toYaml .Values.customLabels | indent 4 }}
+ {{- end }}
+ spec:
++  {{- if not .Values.autoscaler.enabled }}
+   replicas: {{ .Values.replicaCount }}
++  {{- end }}
++  strategy:
++    type: RollingUpdate
++    rollingUpdate:
++      maxUnavailable: 1
++      maxSurge: 10%
+   selector:
+     matchLabels:
+       app.kubernetes.io/instance: {{ .Release.Name | quote }}
+diff --git a/stable/coredns/templates/servicemonitor-autoscaler.yaml b/stable/coredns/templates/servicemonitor-autoscaler.yaml
+new file mode 100644
+index 000000000..08f9540df
+--- /dev/null
++++ ./stable/coredns/templates/servicemonitor-autoscaler.yaml
+@@ -0,0 +1,21 @@
++{{- if .Values.autoscaler.enabled }}
++---
++apiVersion: v1
++kind: ServiceAccount
++metadata:
++  name: {{ template "coredns.fullname" . }}-autoscaler
++  namespace: {{ .Release.Namespace }}
++  labels:
++    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
++    app.kubernetes.io/instance: {{ .Release.Name | quote }}
++    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
++    {{- if .Values.isClusterService }}
++    k8s-app: {{ .Chart.Name }}-autoscaler
++    kubernetes.io/cluster-service: "true"
++    kubernetes.io/name: "CoreDNS"
++    {{- end }}
++    app.kubernetes.io/name: {{ template "coredns.name" . }}-autoscaler
++{{- if .Values.customLabels }}
++{{ toYaml .Values.customLabels | indent 4 }}
++{{- end }}
++{{- end }}
+diff --git a/stable/coredns/values.yaml b/stable/coredns/values.yaml
+index ecda7f858..5c1ce0cb3 100644
+--- ./stable/coredns/values.yaml
++++ ./stable/coredns/values.yaml
+@@ -4,7 +4,7 @@
+ 
+ image:
+   repository: coredns/coredns
+-  tag: "1.6.6"
++  tag: "1.6.7"
+   pullPolicy: IfNotPresent
+ 
+ replicaCount: 1
+@@ -51,7 +51,7 @@ rbac:
+ # isClusterService specifies whether chart should be deployed as cluster-service or normal k8s app.
+ isClusterService: true
+ 
+-# Optional priority class to be used for the coredns pods
++# Optional priority class to be used for the coredns pods. Used for autoscaler if autoscaler.priorityClassName not set.
+ priorityClassName: ""
+ 
+ # Default zone is what Kubernetes recommends:
+@@ -147,5 +147,43 @@ extraSecrets: []
+ # - name: some-fancy-secret
+ #   mountPath: /etc/wherever
+ 
+-# Custom labels to apply to Deployment, Pod, Service, ServiceMonitor
++# Custom labels to apply to Deployment, Pod, Service, ServiceMonitor. Including autoscaler if enabled.
+ customLabels: {}
++
++## Configue a cluster-proportional-autoscaler for coredns
++# See https://github.com/kubernetes-incubator/cluster-proportional-autoscaler
++autoscaler:
++  # Enabled the cluster-proportional-autoscaler
++  enabled: false
++
++  # Number of cores in the cluster per coredns replica
++  coresPerReplica: 256
++  # Number of nodes in the cluster per coredns replica
++  nodesPerReplica: 16
++
++  image:
++    repository: k8s.gcr.io/cluster-proportional-autoscaler-amd64
++    tag: "1.7.1"
++    pullPolicy: IfNotPresent
++
++  # Optional priority class to be used for the autoscaler pods. priorityClassName used if not set.
++  priorityClassName: ""
++
++  # expects input structure as per specification https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#affinity-v1-core
++  affinity: {}
++
++  # Node labels for pod assignment
++  # Ref: https://kubernetes.io/docs/user-guide/node-selection/
++  nodeSelector: {}
++
++  # expects input structure as per specification https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#toleration-v1-core
++  tolerations: []
++
++  # resources for autoscaler pod
++  resources:
++    requests:
++      cpu: "20m"
++      memory: "10Mi"
++    limits:
++      cpu: "20m"
++      memory: "10Mi"
+diff --git a/stable/external-dns/Chart.yaml b/stable/external-dns/Chart.yaml
+index 6862806c0..0b86bcad2 100644
+--- ./stable/external-dns/Chart.yaml
++++ ./stable/external-dns/Chart.yaml
+@@ -1,6 +1,6 @@
+ apiVersion: v1
+ name: external-dns
+-version: 2.15.2
++version: 2.16.0
+ appVersion: 0.5.18
+ description: ExternalDNS is a Kubernetes addon that configures public DNS servers with information about exposed Kubernetes services to make them discoverable.
+ keywords:
+diff --git a/stable/external-dns/README.md b/stable/external-dns/README.md
+index b39a887a4..9343da21b 100755
+--- ./stable/external-dns/README.md
++++ ./stable/external-dns/README.md
+@@ -102,6 +102,7 @@ The following table lists the configurable parameters of the external-dns chart
+ | `digitalocean.apiToken`             | When using the DigitalOcean provider, `DO_TOKEN` to set (optional)                                       | `""`                                                        |
+ | `google.project`                    | When using the Google provider, specify the Google project (required when provider=google)               | `""`                                                        |
+ | `google.serviceAccountSecret`       | When using the Google provider, specify the existing secret which contains credentials.json (optional)   | `""`                                                        |
++| `google.serviceAccountSecretKey`    | When using the Google provider with an existing secret, specify the key name (optional)                  | `"credentials.json"`                                        |
+ | `google.serviceAccountKey`          | When using the Google provider, specify the service account key JSON file. (required when `google.serviceAccountSecret` is not provided. In this case a new secret will be created holding this service account | `""`    |
+ | `infoblox.gridHost`                 | When using the Infoblox provider, specify the Infoblox Grid host (required when provider=infoblox)       | `""`                                                        |
+ | `infoblox.wapiUsername`             | When using the Infoblox provider, specify the Infoblox WAPI username                                     | `"admin"`                                                   |
+diff --git a/stable/external-dns/templates/_helpers.tpl b/stable/external-dns/templates/_helpers.tpl
+index 10e66226e..a82a1cb97 100644
+--- ./stable/external-dns/templates/_helpers.tpl
++++ ./stable/external-dns/templates/_helpers.tpl
+@@ -110,6 +110,49 @@ imagePullSecrets:
+ {{- end -}}
+ {{- end -}}
+ 
++{{/*
++Return true if a secret object should be created
++*/}}
++{{- define "external-dns.createSecret" -}}
++{{- if and (eq .Values.provider "aws") .Values.aws.credentials.secretKey .Values.aws.credentials.accessKey (not .Values.aws.credentials.secretName) }}
++    {{- true -}}
++{{- else if and (eq .Values.provider "azure") (or (and .Values.azure.resourceGroup .Values.azure.tenantId .Values.azure.subscriptionId .Values.azure.aadClientId .Values.azure.aadClientSecret (not .Values.azure.useManagedIdentityExtension)) (and .Values.azure.resourceGroup .Values.azure.tenantId .Values.azure.subscriptionId .Values.azure.useManagedIdentityExtension)) (not .Values.azure.secretName) -}}
++    {{- true -}}
++{{- else if and (eq .Values.provider "cloudflare") (or .Values.cloudflare.apiToken .Values.cloudflare.apiKey) (not .Values.cloudflare.secretName) -}}
++    {{- true -}}
++{{- else if and (eq .Values.provider "digitalocean") .Values.digitalocean.apiToken (not .Values.digitalocean.secretName) -}}
++    {{- true -}}
++{{- else if and (eq .Values.provider "google") .Values.google.serviceAccountKey (not .Values.google.serviceAccountSecret) -}}
++    {{- true -}}
++{{- else if and (eq .Values.provider "infoblox") (and .Values.infoblox.wapiUsername .Values.infoblox.wapiPassword) -}}
++    {{- true -}}
++{{- else if and (eq .Values.provider "rfc2136") .Values.rfc2136.tsigSecret -}}
++    {{- true -}}
++{{- else if and (eq .Values.provider "pdns") .Values.pdns.apiKey -}}
++    {{- true -}}
++{{- else -}}
++{{- end -}}
++{{- end -}}
++
++{{/*
++Return the name of the Secret used to store the passwords
++*/}}
++{{- define "external-dns.secretName" -}}
++{{- if and (eq .Values.provider "aws") .Values.aws.credentials.secretName }}
++{{- .Values.aws.credentials.secretName }}
++{{- else if and (eq .Values.provider "azure") .Values.azure.secretName }}
++{{- .Values.azure.secretName }}
++{{- else if and (eq .Values.provider "cloudflare") .Values.cloudflare.secretName }}
++{{- .Values.cloudflare.secretName }}
++{{- else if and (eq .Values.provider "digitalocean") .Values.digitalocean.secretName }}
++{{- .Values.digitalocean.secretName }}
++{{- else if and (eq .Values.provider "google") .Values.google.serviceAccountSecret }}
++{{- .Values.google.serviceAccountSecret }}
++{{- else -}}
++{{- template "external-dns.fullname" . }}
++{{- end -}}
++{{- end -}}
++
+ {{- define "external-dns.aws-credentials" }}
+ [default]
+ aws_access_key_id = {{ .Values.aws.credentials.accessKey }}
+diff --git a/stable/external-dns/templates/deployment.yaml b/stable/external-dns/templates/deployment.yaml
+index 765ac065e..5c8d6d053 100755
+--- ./stable/external-dns/templates/deployment.yaml
++++ ./stable/external-dns/templates/deployment.yaml
+@@ -14,7 +14,7 @@ spec:
+         {{- if or .Values.podAnnotations .Values.metrics.enabled }}
+         {{ include "external-dns.podAnnotations" . | nindent 8 }}
+         {{- end }}
+-        {{- if or (and .Values.aws.credentials.secretKey .Values.aws.credentials.accessKey) (or .Values.cloudflare.apiToken .Values.cloudflare.apiKey) .Values.digitalocean.apiToken (and .Values.infoblox.wapiUsername .Values.infoblox.wapiPassword) .Values.rfc2136.tsigSecret .Values.extraEnv .Values.google.serviceAccountKey }}
++        {{- if (include "external-dns.createSecret" .) }}
+         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+         {{- end }}
+         {{- if and (eq .Values.provider "designate") .Values.designate.customCA.enabled }}
+@@ -230,17 +230,17 @@ spec:
+         {{- end }}
+         # Cloudflare environment variables
+         {{- if eq .Values.provider "cloudflare" }}
+-        {{- if .Values.cloudflare.apiToken }}
++        {{- if or .Values.cloudflare.apiToken .Values.cloudflare.secretName }}
+         - name: CF_API_TOKEN
+           valueFrom:
+             secretKeyRef:
+-              name: {{ template "external-dns.fullname" . }}
++              name: {{ template "external-dns.secretName" . }}
+               key: cloudflare_api_token
+-        {{- else }}
++        {{- else if or .Values.cloudflare.apiKey .Values.cloudflare.secretName }}
+         - name: CF_API_KEY
+           valueFrom:
+             secretKeyRef:
+-              name: {{ template "external-dns.fullname" . }}
++              name: {{ template "external-dns.secretName" . }}
+               key: cloudflare_api_key
+         - name: CF_API_EMAIL
+           value: {{ required "cloudflare.email is required if cloudflare.apiToken is not provided" .Values.cloudflare.email | quote }}
+@@ -260,15 +260,13 @@ spec:
+         {{- end }}
+         {{- end }}
+         # DigitalOcean environment variables
+-        {{- if eq .Values.provider "digitalocean" }}
+-        {{- if .Values.digitalocean.apiToken }}
++        {{- if and (eq .Values.provider "digitalocean") (or .Values.digitalocean.apiToken .Values.digitalocean.secretName) }}
+         - name: DO_TOKEN
+           valueFrom:
+             secretKeyRef:
+-              name: {{ template "external-dns.fullname" . }}
++              name: {{ template "external-dns.secretName" . }}
+               key: digitalocean_api_token
+         {{- end }}
+-        {{- end }}
+         # Google environment variables
+         {{- if eq .Values.provider "google" }}
+         {{- if or .Values.google.serviceAccountSecret .Values.google.serviceAccountKey }}
+@@ -290,12 +288,12 @@ spec:
+         - name: EXTERNAL_DNS_INFOBLOX_WAPI_USERNAME
+           valueFrom:
+             secretKeyRef:
+-              name: {{ template "external-dns.fullname" . }}
++              name: {{ template "external-dns.secretName" . }}
+               key: infoblox_wapi_username
+         - name: EXTERNAL_DNS_INFOBLOX_WAPI_PASSWORD
+           valueFrom:
+             secretKeyRef:
+-              name: {{ template "external-dns.fullname" . }}
++              name: {{ template "external-dns.secretName" . }}
+               key: infoblox_wapi_password
+         {{- end }}
+         {{- end }}
+@@ -304,7 +302,7 @@ spec:
+         - name: EXTERNAL_DNS_RFC2136_TSIG_SECRET
+           valueFrom:
+             secretKeyRef:
+-              name: {{ template "external-dns.fullname" . }}
++              name: {{ template "external-dns.secretName" . }}
+               key: rfc2136_tsig_secret
+         {{- end }}
+         {{- if and (eq .Values.provider "designate") .Values.designate.customCA.enabled }}
+@@ -316,7 +314,7 @@ spec:
+         - name: PDNS_API_KEY
+           valueFrom:
+             secretKeyRef:
+-              name: {{ template "external-dns.fullname" . }}
++              name: {{ template "external-dns.secretName" . }}
+               key: pdns_api_key
+         {{- end }}
+         # Extra environment variables
+@@ -336,7 +334,7 @@ spec:
+         {{- end }}
+         volumeMounts:
+         # AWS mountPath(s)
+-        {{- if and (eq .Values.provider "aws") (or .Values.aws.assumeRoleArn (and .Values.aws.credentials.secretKey .Values.aws.credentials.accessKey)) }}
++        {{- if and (eq .Values.provider "aws") (or (and .Values.aws.credentials.secretKey .Values.aws.credentials.accessKey) .Values.aws.credentials.secretName) }}
+         - name: aws-credentials
+           mountPath: {{ .Values.aws.credentials.mountPath }}
+           readOnly: true
+@@ -358,12 +356,10 @@ spec:
+           readOnly: true
+         {{- end }}
+         # Google mountPath(s)
+-        {{- if eq .Values.provider "google" }}
+-        {{- if or .Values.google.serviceAccountSecret .Values.google.serviceAccountKey }}
++        {{- if and (eq .Values.provider "google") (or .Values.google.serviceAccountKey .Values.google.serviceAccountSecret) }}
+         - name: google-service-account
+           mountPath: /etc/secrets/service-account/
+         {{- end }}
+-        {{- end }}
+         # Designate mountPath(s)
+         {{- if and (eq .Values.provider "designate") .Values.designate.customCA.enabled }}
+         - name: designate-custom-ca
+@@ -372,20 +368,17 @@ spec:
+         {{- end }}
+       volumes:
+       # AWS volume(s)
+-      {{- if and (eq .Values.provider "aws") (or .Values.aws.assumeRoleArn (and .Values.aws.credentials.secretKey .Values.aws.credentials.accessKey)) }}
++      {{- if and (eq .Values.provider "aws") (or (and .Values.aws.credentials.secretKey .Values.aws.credentials.accessKey) .Values.aws.credentials.secretName) }}
+       - name: aws-credentials
+         secret:
+-          secretName: {{ template "external-dns.fullname" . }}
++          secretName: {{ template "external-dns.secretName" . }}
+       {{- end }}
+       # Azure volume(s)
+       {{- if eq .Values.provider "azure" }}
+       - name: azure-config-file
+-        {{- if .Values.azure.secretName }}
+-        secret:
+-          secretName: {{ .Values.azure.secretName }}
+-        {{- else if (and .Values.azure.resourceGroup .Values.azure.tenantId .Values.azure.subscriptionId) }}
++        {{- if or .Values.azure.secretName (and .Values.azure.resourceGroup .Values.azure.tenantId .Values.azure.subscriptionId) }}
+         secret:
+-          secretName: {{ template "external-dns.fullname" . }}
++          secretName: {{ template "external-dns.secretName" . }}
+         {{- else if not .Values.azure.useManagedIdentityExtension }}
+         hostPath:
+           path: /etc/kubernetes/azure.json
+@@ -400,15 +393,14 @@ spec:
+           defaultMode: 400
+       {{- end }}
+       # Google volume(s)
+-      {{- if eq .Values.provider "google" }}
+-      {{- if .Values.google.serviceAccountSecret }}
+-      - name: google-service-account
+-        secret:
+-          secretName: {{ .Values.google.serviceAccountSecret | quote }}
+-      {{- else if .Values.google.serviceAccountKey }}
++      {{- if and (eq .Values.provider "google") (or .Values.google.serviceAccountKey .Values.google.serviceAccountSecret) }}
+       - name: google-service-account
+         secret:
+-          secretName: {{ template "external-dns.fullname" . }}
++          secretName: {{ template "external-dns.secretName" . }}
++          {{- if and .Values.google.serviceAccountSecret .Values.google.serviceAccountSecretKey }}
++          items:
++          - key: {{ .Values.google.serviceAccountSecretKey | quote }}
++            path: credentials.json
+           {{- end }}
+       {{- end }}
+       # Designate volume(s)
+diff --git a/stable/external-dns/templates/secret.yaml b/stable/external-dns/templates/secret.yaml
+index 4086af250..980f6f094 100644
+--- ./stable/external-dns/templates/secret.yaml
++++ ./stable/external-dns/templates/secret.yaml
+@@ -1,4 +1,4 @@
+-{{- if or .Values.aws.assumeRoleArn (and .Values.aws.credentials.secretKey .Values.aws.credentials.accessKey) (or .Values.cloudflare.apiToken .Values.cloudflare.apiKey) .Values.digitalocean.apiToken .Values.google.serviceAccountKey (and .Values.infoblox.wapiUsername .Values.infoblox.wapiPassword) .Values.rfc2136.tsigSecret .Values.pdns.apiKey (and .Values.azure.resourceGroup .Values.azure.tenantId .Values.azure.subscriptionId .Values.azure.aadClientId .Values.azure.aadClientSecret (not .Values.azure.useManagedIdentityExtension)) (and .Values.azure.resourceGroup .Values.azure.tenantId .Values.azure.subscriptionId .Values.azure.useManagedIdentityExtension) }}
++{{- if (include "external-dns.createSecret" .) }}
+ apiVersion: v1
+ kind: Secret
+ metadata:
+@@ -7,14 +7,15 @@ metadata:
+ type: Opaque
+ data:
+   {{- if eq .Values.provider "aws" }}
+-  {{- if and .Values.aws.credentials.secretKey .Values.aws.credentials.accessKey }}
+   credentials: {{ include "external-dns.aws-credentials" . | b64enc | quote }}
+-  {{- end }}
+   {{- if .Values.aws.region }}
+   config: {{ include "external-dns.aws-config" . | b64enc | quote }}
+   {{- end }}
+   {{- end }}
+-  {{- if and (eq .Values.provider "google") .Values.google.serviceAccountKey }}
++  {{- if eq .Values.provider "azure" }}
++  azure.json: {{ include "external-dns.azure-credentials" . | b64enc | quote }}
++  {{- end }}
++  {{- if eq .Values.provider "google" }}
+   credentials.json: {{ .Values.google.serviceAccountKey | b64enc | quote }}
+   {{- end }}
+   {{- if eq .Values.provider "cloudflare" }}
+@@ -24,20 +25,17 @@ data:
+   cloudflare_api_key: {{ required "cloudflare.apiKey is required if cloudflare.apiToken is not provided" .Values.cloudflare.apiKey | b64enc | quote }}
+   {{- end }}
+   {{- end }}
+-  {{- if .Values.digitalocean.apiToken }}
++  {{- if eq .Values.provider "digitalocean" }}
+   digitalocean_api_token: {{ .Values.digitalocean.apiToken | b64enc | quote }}
+   {{- end }}
+-  {{- if and .Values.infoblox.wapiUsername .Values.infoblox.wapiPassword }}
++  {{- if eq .Values.provider "infoblox" }}
+   infoblox_wapi_username: {{ .Values.infoblox.wapiUsername | b64enc | quote }}
+   infoblox_wapi_password: {{ .Values.infoblox.wapiPassword | b64enc | quote }}
+   {{- end }}
+-  {{- if .Values.rfc2136.tsigSecret }}
+-  rfc2136_tsig_secret: {{ .Values.rfc2136.tsigSecret | b64enc | quote }}
+-  {{- end }}
+-  {{- if .Values.pdns.apiKey }}
++  {{- if eq .Values.provider "pdns" }}
+   pdns_api_key: {{ .Values.pdns.apiKey | b64enc | quote }}
+   {{- end }}
+-  {{- if eq .Values.provider "azure" }}
+-  azure.json: {{ (include "external-dns.azure-credentials" .) | b64enc | quote }}
++  {{- if eq .Values.provider "rfc2136" }}
++  rfc2136_tsig_secret: {{ .Values.rfc2136.tsigSecret | b64enc | quote }}
+   {{- end }}
+ {{- end }}
+diff --git a/stable/external-dns/values-production.yaml b/stable/external-dns/values-production.yaml
+index f17499473..dd2c6ae47 100644
+--- ./stable/external-dns/values-production.yaml
++++ ./stable/external-dns/values-production.yaml
+@@ -80,6 +80,11 @@ aws:
+     ## pre external-dns 0.5.9 home dir should be `/root/.aws`
+     ##
+     mountPath: "/.aws"
++    ## Use an existing secret with key "credentials" defined.
++    ## This ignores aws.credentials.secretKey, and aws.credentials.accessKey
++    ##
++    # secretName:
++
+   ## AWS region
+   ##
+   region: "us-east-1"
+@@ -142,6 +147,10 @@ cloudflare:
+   ## `CF_API_KEY` to set in the environment
+   ##
+   apiKey: ""
++  ## Use an existing secret with keys "cloudflare_api_token" or "cloudflare_api_key" defined.
++  ## This ignores cloudflare.apiToken, and cloudflare.apiKey
++  ##
++  # secretName:
+   ## `CF_API_EMAIL` to set in the environment
+   ##
+   email: ""
+@@ -208,6 +217,10 @@ digitalocean:
+   ## `DO_TOKEN` to set in the environment
+   ##
+   apiToken: ""
++  ## Use an existing secret with key "digitalocean_api_token" defined.
++  ## This ignores digitalocean.apiToken
++  ##
++  # secretName:
+ 
+ ## Google configuration to be set via arguments/env. variables
+ ##
+@@ -218,6 +231,7 @@ google:
+   ## Google Application Credentials
+   ##
+   serviceAccountSecret: ""
++  serviceAccountSecretKey: "credentials.json"
+   serviceAccountKey: ""
+ 
+ ## Infoblox configuration to be set via arguments/env. variables
+diff --git a/stable/external-dns/values.yaml b/stable/external-dns/values.yaml
+index ff4f2c150..bcaa69a37 100644
+--- ./stable/external-dns/values.yaml
++++ ./stable/external-dns/values.yaml
+@@ -80,6 +80,11 @@ aws:
+     ## pre external-dns 0.5.9 home dir should be `/root/.aws`
+     ##
+     mountPath: "/.aws"
++    ## Use an existing secret with key "credentials" defined.
++    ## This ignores aws.credentials.secretKey, and aws.credentials.accessKey
++    ##
++    # secretName:
++
+   ## AWS region
+   ##
+   region: "us-east-1"
+@@ -141,6 +146,10 @@ cloudflare:
+   ## `CF_API_KEY` to set in the environment
+   ##
+   apiKey: ""
++  ## Use an existing secret with keys "cloudflare_api_token" or "cloudflare_api_key" defined.
++  ## This ignores cloudflare.apiToken, and cloudflare.apiKey
++  ##
++  # secretName:
+   ## `CF_API_EMAIL` to set in the environment
+   ##
+   email: ""
+@@ -207,6 +216,10 @@ digitalocean:
+   ## `DO_TOKEN` to set in the environment
+   ##
+   apiToken: ""
++  ## Use an existing secret with key "digitalocean_api_token" defined.
++  ## This ignores digitalocean.apiToken
++  ##
++  # secretName:
+ 
+ ## Google configuration to be set via arguments/env. variables
+ ##
+@@ -217,6 +230,7 @@ google:
+   ## Google Application Credentials
+   ##
+   serviceAccountSecret: ""
++  serviceAccountSecretKey: "credentials.json"
+   serviceAccountKey: ""
+ 
+ ## Infoblox configuration to be set via arguments/env. variables
+diff --git a/stable/falco/CHANGELOG.md b/stable/falco/CHANGELOG.md
+index a4457707f..489dfb890 100644
+--- ./stable/falco/CHANGELOG.md
++++ ./stable/falco/CHANGELOG.md
+@@ -1,8 +1,16 @@
+ # Change Log
+ 
+-This file documents all notable changes to Sysdig Falco Helm Chart. The release
++This file documents all notable changes to Falco Helm Chart. The release
+ numbering uses [semantic versioning](http://semver.org).
+ 
++## v1.1.1
++
++### Minor Changes
++
++* Upgrade to Falco 0.19.0
++* Upgrade rules to Falco 0.19.0
++* Remove Sysdig references, Falco is a project by its own name
++
+ ## v1.1.0
+ 
+ ### Minor Changes
+diff --git a/stable/falco/Chart.yaml b/stable/falco/Chart.yaml
+index de40d8030..316fd626a 100644
+--- ./stable/falco/Chart.yaml
++++ ./stable/falco/Chart.yaml
+@@ -1,7 +1,7 @@
+ apiVersion: v1
+ name: falco
+-version: 1.1.0
+-appVersion: 0.18.0
++version: 1.1.1
++appVersion: 0.19.0
+ description: Falco
+ keywords:
+   - monitoring
+diff --git a/stable/falco/README.md b/stable/falco/README.md
+index 0cae812f5..b856683b9 100644
+--- ./stable/falco/README.md
++++ ./stable/falco/README.md
+@@ -1,8 +1,8 @@
+-# Sysdig Falco
++# Falco
+ 
+-[Sysdig Falco](https://falco.org) is a behavioral activity monitor designed to detect anomalous activity in your applications. You can use Falco to monitor run-time security of your Kubernetes applications and internal components.
++[Falco](https://falco.org) is a behavioral activity monitor designed to detect anomalous activity in your applications. You can use Falco to monitor run-time security of your Kubernetes applications and internal components.
+ 
+-To know more about Sysdig Falco have a look at:
++To know more about Falco have a look at:
+ 
+ - [Kubernetes security logging with Falco & Fluentd
+ ](https://sysdig.com/blog/kubernetes-security-logging-fluentd-falco/)
+@@ -47,7 +47,7 @@ The following table lists the configurable parameters of the Falco chart and the
+ | ---                                             | ---                                                                                                                | ---                                                                                                                                       |
+ | `image.registry`                                | The image registry to pull from                                                                                    | `docker.io`                                                                                                                               |
+ | `image.repository`                              | The image repository to pull from                                                                                  | `falcosecurity/falco`                                                                                                                     |
+-| `image.tag`                                     | The image tag to pull                                                                                              | `0.18.0`                                                                                                                                  |
++| `image.tag`                                     | The image tag to pull                                                                                              | `0.19.0`                                                                                                                                  |
+ | `image.pullPolicy`                              | The image pull policy                                                                                              | `IfNotPresent`                                                                                                                            |
+ | `containerd.enabled`                            | Enable ContainerD support                                                                                          | `true`                                                                                                                                    |
+ | `containerd.socket`                             | The path of the ContainerD socket                                                                                  | `/run/containerd/containerd.sock`                                                                                                         |
+diff --git a/stable/falco/rules/falco_rules.yaml b/stable/falco/rules/falco_rules.yaml
+index eff803256..75a33f154 100644
+--- ./stable/falco/rules/falco_rules.yaml
++++ ./stable/falco/rules/falco_rules.yaml
+@@ -443,10 +443,11 @@
+     open_write and
+     (fd.filename in (shell_config_filenames) or
+      fd.name in (shell_config_files) or
+-     fd.directory in (shell_config_directories)) and
+-    not proc.name in (shell_binaries)
++     fd.directory in (shell_config_directories))
++    and not proc.name in (shell_binaries)
++    and not exe_running_docker_save
+   output: >
+-    a shell configuration file has been modified (user=%user.name command=%proc.cmdline file=%fd.name container_id=%container.id image=%container.image.repository)
++    a shell configuration file has been modified (user=%user.name command=%proc.cmdline pcmdline=%proc.pcmdline file=%fd.name container_id=%container.id image=%container.image.repository)
+   priority:
+     WARNING
+   tag: [file, mitre_persistence]
+@@ -845,7 +846,10 @@
+   condition: (proc.name=start-ipsec.sh and fd.directory=/etc/ipsec)
+ 
+ - macro: exe_running_docker_save
+-  condition: (proc.cmdline startswith "exe /var/lib/docker" and proc.pname in (dockerd, docker))
++  condition: >
++    proc.name = "exe"
++    and proc.cmdline contains "/var/lib/docker"
++    and proc.pname in (dockerd, docker)
+ 
+ # Ideally we'd have a length check here as well but sysdig
+ # filterchecks don't have operators like len()
+@@ -916,9 +920,11 @@
+ - rule: Update Package Repository
+   desc: Detect package repositories get updated
+   condition: >
+-    ((open_write and access_repositories) or (modify and modify_repositories)) and not package_mgmt_procs
++    ((open_write and access_repositories) or (modify and modify_repositories))
++    and not package_mgmt_procs
++    and not exe_running_docker_save
+   output: >
+-    Repository files get updated (user=%user.name command=%proc.cmdline file=%fd.name newpath=%evt.arg.newpath container_id=%container.id image=%container.image.repository)
++    Repository files get updated (user=%user.name command=%proc.cmdline pcmdline=%proc.pcmdline file=%fd.name newpath=%evt.arg.newpath container_id=%container.id image=%container.image.repository)
+   priority:
+     NOTICE
+   tags: [filesystem, mitre_persistence]
+@@ -1147,6 +1153,9 @@
+ - macro: etcd_manager_updating_dns
+   condition: (container and proc.name=etcd-manager and fd.name=/etc/hosts)
+ 
++- macro: automount_using_mtab
++  condition: (proc.pname = automount and fd.name startswith /etc/mtab)
++
+ # Add conditions to this macro (probably in a separate file,
+ # overwriting this macro) to allow for specific combinations of
+ # programs writing below specific directories below
+@@ -1263,6 +1272,7 @@
+     and not jboss_in_container_writing_passwd
+     and not etcd_manager_updating_dns
+     and not user_known_write_below_etc_activities
++    and not automount_using_mtab
+ 
+ - rule: Write below etc
+   desc: an attempt to write to any file below /etc
+@@ -1832,10 +1842,14 @@
+ - macro: sensitive_mount
+   condition: (container.mount.dest[/proc*] != "N/A" or
+               container.mount.dest[/var/run/docker.sock] != "N/A" or
++              container.mount.dest[/var/run/crio/crio.sock] != "N/A" or
+               container.mount.dest[/var/lib/kubelet] != "N/A" or
+               container.mount.dest[/var/lib/kubelet/pki] != "N/A" or
+               container.mount.dest[/] != "N/A" or
++              container.mount.dest[/home/admin] != "N/A" or
+               container.mount.dest[/etc] != "N/A" or
++              container.mount.dest[/etc/kubernetes] != "N/A" or
++              container.mount.dest[/etc/kubernetes/manifests] != "N/A" or
+               container.mount.dest[/root*] != "N/A")
+ 
+ # The steps libcontainer performs to set up the root program for a container are:
+@@ -1850,7 +1864,7 @@
+ # when we lose events and lose track of state.
+ 
+ - macro: container_entrypoint
+-  condition: (not proc.pname exists or proc.pname in (runc:[0:PARENT], runc:[1:CHILD], runc, docker-runc, exe))
++  condition: (not proc.pname exists or proc.pname in (runc:[0:PARENT], runc:[1:CHILD], runc, docker-runc, exe, docker-runc-cur))
+ 
+ - rule: Launch Sensitive Mount Container
+   desc: >
+@@ -2210,13 +2224,27 @@
+   priority: NOTICE
+   tags: [network, aws, container, mitre_discovery]
+ 
+-# In a local/user rules file, you should override this macro with the
+-# IP address of your k8s api server. The IP 1.2.3.4 is a placeholder
+-# IP that is not likely to be seen in practice.
+-- macro: k8s_api_server
+-  condition: (fd.sip="1.2.3.4" and fd.sport=8080)
+ 
+-# In a local/user rules file, list the container images that are
++# This rule is not enabled by default, since this rule is for cloud environment(GCP, AWS and Azure) only.
++# If you want to enable this rule, overwrite the first macro,
++# And you can filter the container that you want to allow access to metadata by overwriting the second macro.
++- macro: consider_metadata_access
++  condition: (never_true)
++
++- macro: user_known_metadata_access
++  condition: (k8s.ns.name = "kube-system")
++
++# On GCP, AWS and Azure, 169.254.169.254 is a special IP used to fetch
++# metadata about the instance. The metadata could be used to get credentials by attackers.
++- rule: Contact cloud metadata service from container
++  desc: Detect attempts to contact the Cloud Instance Metadata Service from a container
++  condition: outbound and fd.sip="169.254.169.254" and container and consider_metadata_access and not user_known_metadata_access
++  output: Outbound connection to cloud instance metadata service (command=%proc.cmdline connection=%fd.name %container.info image=%container.image.repository:%container.image.tag)
++  priority: NOTICE
++  tags: [network, container, mitre_discovery]
++
++
++# In a local/user rules file, list the namespace or container images that are
+ # allowed to contact the K8s API Server from within a container. This
+ # might cover cases where the K8s infrastructure itself is running
+ # within a container.
+@@ -2224,11 +2252,14 @@
+   condition: >
+     (container.image.repository in (gcr.io/google_containers/hyperkube-amd64,
+      gcr.io/google_containers/kube2sky, sysdig/agent, sysdig/falco,
+-     sysdig/sysdig))
++     sysdig/sysdig, falcosecurity/falco) or (k8s.ns.name = "kube-system"))
++
++- macro: k8s_api_server
++  condition: (fd.sip.name="kubernetes.default.svc.cluster.local")
+ 
+ - rule: Contact K8S API Server From Container
+   desc: Detect attempts to contact the K8S API Server from a container
+-  condition: outbound and k8s_api_server and container and not k8s_containers
++  condition: evt.type=connect and evt.dir=< and (fd.typechar=4 or fd.typechar=6) and container and not k8s_containers and k8s_api_server
+   output: Unexpected connection to K8s API Server from container (command=%proc.cmdline %container.info image=%container.image.repository:%container.image.tag connection=%fd.name)
+   priority: NOTICE
+   tags: [network, k8s, container, mitre_discovery]
+@@ -2250,16 +2281,30 @@
+   tags: [network, k8s, container, mitre_port_knocking]
+ 
+ - list: network_tool_binaries
+-  items: [nc, ncat, nmap, dig, tcpdump, tshark, ngrep]
++  items: [nc, ncat, nmap, dig, tcpdump, tshark, ngrep, telnet, mitmproxy, socat]
+ 
+ - macro: network_tool_procs
+   condition: (proc.name in (network_tool_binaries))
+ 
++# In a local/user rules file, create a condition that matches legitimate uses
++# of a package management process inside a container.
++#
++# For example:
++# - macro: user_known_package_manager_in_container
++#   condition: proc.cmdline="dpkg -l"
++- macro: user_known_package_manager_in_container
++  condition: (never_true)
++
+ # Container is supposed to be immutable. Package management should be done in building the image.
+ - rule: Launch Package Management Process in Container
+   desc: Package management process ran inside container
+   condition: >
+-    spawned_process and container and user.name != "_apt" and package_mgmt_procs and not package_mgmt_ancestor_procs
++    spawned_process
++    and container
++    and user.name != "_apt"
++    and package_mgmt_procs
++    and not package_mgmt_ancestor_procs
++    and not user_known_package_manager_in_container
+   output: >
+     Package management process launched in container (user=%user.name
+     command=%proc.cmdline container_id=%container.id container_name=%container.name image=%container.image.repository:%container.image.tag)
+@@ -2436,16 +2481,19 @@
+   condition: (always_true)
+ 
+ - list: user_known_chmod_applications
+-  items: []
++  items: [hyperkube, kubelet]
+ 
+ - rule: Set Setuid or Setgid bit
+   desc: >
+     When the setuid or setgid bits are set for an application,
+     this means that the application will run with the privileges of the owning user or group respectively.
+     Detect setuid or setgid bits set via chmod
+-  condition: consider_all_chmods and chmod and (evt.arg.mode contains "S_ISUID" or evt.arg.mode contains "S_ISGID") and not proc.cmdline in (user_known_chmod_applications)
++  condition: >
++    consider_all_chmods and chmod and (evt.arg.mode contains "S_ISUID" or evt.arg.mode contains "S_ISGID")
++    and not proc.name in (user_known_chmod_applications)
++    and not exe_running_docker_save
+   output: >
+-    Setuid or setgid bit is set via chmod (fd=%evt.arg.fd filename=%evt.arg.filename mode=%evt.arg.mode user=%user.name
++    Setuid or setgid bit is set via chmod (fd=%evt.arg.fd filename=%evt.arg.filename mode=%evt.arg.mode user=%user.name process=%proc.name
+     command=%proc.cmdline container_id=%container.id container_name=%container.name image=%container.image.repository:%container.image.tag)
+   priority:
+     NOTICE
+@@ -2595,6 +2643,39 @@
+   priority: CRITICAL
+   tags: [process, mitre_execution]
+ 
++- list: k8s_client_binaries
++  items: [docker, kubectl, crictl]
++
++# Whitelist for known docker client binaries run inside container
++# - k8s.gcr.io/fluentd-gcp-scaler in GCP/GKE 
++- macro: user_known_k8s_client_container
++  condition: (k8s.ns.name="kube-system" and container.image.repository=k8s.gcr.io/fluentd-gcp-scaler)
++  
++- rule: The docker client is executed in a container
++  desc: Detect a k8s client tool executed inside a container
++  condition: spawned_process and container and not user_known_k8s_client_container and proc.name in (k8s_client_binaries)
++  output: "Docker or kubernetes client executed in container (user=%user.name %container.info parent=%proc.pname cmdline=%proc.cmdline image=%container.image.repository:%container.image.tag)"
++  priority: WARNING
++  tags: [container, mitre_execution]
++
++
++# This rule is not enabled by default, as there are legitimate use
++# cases for raw packet. If you want to enable it, modify the
++# following macro.
++- macro: consider_packet_socket_communication
++  condition: (never_true)
++
++- list: user_known_packet_socket_binaries
++  items: []
++
++- rule: Packet socket created in container
++  desc: Detect new packet socket at the device driver (OSI Layer 2) level in a container. Packet socket could be used to do ARP Spoofing by attacker.
++  condition: evt.type=socket and evt.arg[0]=AF_PACKET and consider_packet_socket_communication and container and not proc.name in (user_known_packet_socket_binaries)
++  output: Packet socket was created in a container (user=%user.name command=%proc.cmdline socket_info=%evt.args container_id=%container.id container_name=%container.name image=%container.image.repository:%container.image.tag)
++  priority: NOTICE
++  tags: [network, mitre_discovery]
++  
++
+ # Application rules have moved to application_rules.yaml. Please look
+ # there if you want to enable them by adding to
+ # falco_rules.local.yaml.
+diff --git a/stable/falco/rules/k8s_audit_rules.yaml b/stable/falco/rules/k8s_audit_rules.yaml
+index a783dcf6e..aa03ed41b 100644
+--- ./stable/falco/rules/k8s_audit_rules.yaml
++++ ./stable/falco/rules/k8s_audit_rules.yaml
+@@ -125,7 +125,7 @@
+ 
+ - macro: sensitive_vol_mount
+   condition: >
+-    (ka.req.pod.volumes.hostpath intersects (/proc, /var/run/docker.sock, /, /etc, /root))
++    (ka.req.pod.volumes.hostpath intersects (/proc, /var/run/docker.sock, /, /etc, /root, /var/run/crio/crio.sock, /home/admin, /var/lib/kubelet, /var/lib/kubelet/pki, /etc/kubernetes, /etc/kubernetes/manifests))
+ 
+ - rule: Create Sensitive Mount Pod
+   desc: >
+diff --git a/stable/falco/values.yaml b/stable/falco/values.yaml
+index 07589e952..ee6857fa2 100644
+--- ./stable/falco/values.yaml
++++ ./stable/falco/values.yaml
+@@ -3,7 +3,7 @@
+ image:
+   registry: docker.io
+   repository: falcosecurity/falco
+-  tag: 0.18.0
++  tag: 0.19.0
+   pullPolicy: IfNotPresent
+ 
+ docker:
+@@ -17,7 +17,7 @@ containerd:
+ resources:
+   # Although resources needed are subjective on the actual workload we provide
+   # a sane defaults ones. If you have more questions or concerns, please refer
+-  # to Sysdig Support for more info about it
++  # to #falco slack channel for more info about it
+   requests:
+     cpu: 100m
+     memory: 512Mi
+@@ -83,7 +83,7 @@ ebpf:
+     mountEtcVolume: true
+ 
+ auditLog:
+-  # true here activates the K8s Audit Log feature for Sysdig Secure
++  # true here activates the K8s Audit Log feature for Falco
+   enabled: false
+ 
+   dynamicBackend:
+@@ -189,7 +189,7 @@ falco:
+ 
+   # Falco contains an embedded webserver that can be used to accept K8s
+   # Audit Events. These config options control the behavior of that
+-  # webserver. (By default, the webserver is disabled).
++  # webserver. (By default, the webserver is enabled).
+   webserver:
+     enabled: true
+     listenPort: 8765
+diff --git a/stable/ghost/Chart.yaml b/stable/ghost/Chart.yaml
+index 2ccb1a786..0f82cb4c6 100644
+--- ./stable/ghost/Chart.yaml
++++ ./stable/ghost/Chart.yaml
+@@ -1,7 +1,7 @@
+ apiVersion: v1
+ name: ghost
+-version: 9.1.3
+-appVersion: 3.3.0
++version: 9.1.4
++appVersion: 3.4.0
+ description: A simple, powerful publishing platform that allows you to share your stories with the world
+ keywords:
+ - ghost
+diff --git a/stable/ghost/requirements.lock b/stable/ghost/requirements.lock
+index 6c26845a4..6cc4829dd 100644
+--- ./stable/ghost/requirements.lock
++++ ./stable/ghost/requirements.lock
+@@ -1,6 +1,6 @@
+ dependencies:
+ - name: mariadb
+   repository: https://kubernetes-charts.storage.googleapis.com/
+-  version: 7.3.5
++  version: 7.3.6
+ digest: sha256:27bef733eb099a7377055cfe2c48e013bd4d55650ff18b50138c80488c812b0b
+-generated: 2020-01-23T20:32:25.822558509Z
++generated: 2020-01-29T06:22:52.921218702Z
+diff --git a/stable/ghost/values.yaml b/stable/ghost/values.yaml
+index 15f801f50..773269d6b 100644
+--- ./stable/ghost/values.yaml
++++ ./stable/ghost/values.yaml
+@@ -14,7 +14,7 @@
+ image:
+   registry: docker.io
+   repository: bitnami/ghost
+-  tag: 3.3.0-debian-10-r0
++  tag: 3.4.0-debian-10-r0
+   ## Specify a imagePullPolicy
+   ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+   ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
+diff --git a/stable/helm-exporter/Chart.yaml b/stable/helm-exporter/Chart.yaml
+index 623a5dc37..9d3e91d9c 100644
+--- ./stable/helm-exporter/Chart.yaml
++++ ./stable/helm-exporter/Chart.yaml
+@@ -1,11 +1,12 @@
+ apiVersion: v1
+ appVersion: "0.4.0"
+-description: Exports helm release stats to prometheus
++description: DEPRECATED Exports helm release stats to prometheus
+ name: helm-exporter
+-version: 0.3.2
++version: 0.3.3
+ home: https://github.com/sstarcher/helm-exporter
+ sources:
+ - https://github.com/sstarcher/helm-exporter
+-maintainers:
+-- name: sstarcher
+-  email: shane.starcher@gmail.com
++# The helm-exporter chart is deprecated and no longer maintained. For details deprecation,
++# including how to un-deprecate a chart see the PROCESSES.md file.
++# The chart is now located here https://github.com/sstarcher/helm-exporter
++deprecated: true
+diff --git a/stable/joomla/Chart.yaml b/stable/joomla/Chart.yaml
+index 619822225..e5568443d 100644
+--- ./stable/joomla/Chart.yaml
++++ ./stable/joomla/Chart.yaml
+@@ -1,7 +1,7 @@
+ apiVersion: v1
+ name: joomla
+-version: 7.1.4
+-appVersion: 3.9.14
++version: 7.1.5
++appVersion: 3.9.15
+ description: PHP content management system (CMS) for publishing web content
+ keywords:
+ - joomla
+diff --git a/stable/joomla/values.yaml b/stable/joomla/values.yaml
+index a85907eb0..0d76d3c6b 100644
+--- ./stable/joomla/values.yaml
++++ ./stable/joomla/values.yaml
+@@ -14,7 +14,7 @@
+ image:
+   registry: docker.io
+   repository: bitnami/joomla
+-  tag: 3.9.14-debian-10-r0
++  tag: 3.9.15-debian-10-r0
+   ## Specify a imagePullPolicy
+   ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+   ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
+@@ -97,7 +97,7 @@ mariadb:
+   image:
+     registry: docker.io
+     repository: bitnami/mariadb
+-    tag: 10.1.43-debian-10-r0
++    tag: 10.1.43-debian-10-r4
+   ## Disable MariaDB replication
+   replication:
+     enabled: false
+@@ -286,7 +286,7 @@ metrics:
+   image:
+     registry: docker.io
+     repository: bitnami/apache-exporter
+-    tag: 0.7.0-debian-10-r0
++    tag: 0.7.0-debian-10-r4
+     pullPolicy: IfNotPresent
+     ## Optionally specify an array of imagePullSecrets.
+     ## Secrets must be manually created in the namespace.
+diff --git a/stable/karma/Chart.yaml b/stable/karma/Chart.yaml
+index 885669583..19572e65e 100644
+--- ./stable/karma/Chart.yaml
++++ ./stable/karma/Chart.yaml
+@@ -1,12 +1,12 @@
+ apiVersion: v1
+-appVersion: "v0.50"
++appVersion: "v0.55"
+ description: A Helm chart for Karma - an UI for Prometheus Alertmanager
+ name: karma
+ home: https://github.com/prymitive/karma
+ sources:
+   - https://hub.docker.com/r/lmierzwa/karma/
+   - https://github.com/prymitive/karma
+-version: 1.4.0
++version: 1.4.1
+ maintainers:
+ - name: davidkarlsen
+   email: david@davidkarlsen.com
+diff --git a/stable/karma/README.md b/stable/karma/README.md
+index d2683146d..58cf6c269 100644
+--- ./stable/karma/README.md
++++ ./stable/karma/README.md
+@@ -41,7 +41,7 @@ The following table lists the configurable parameters of the karma chart and the
+ |-------------------------------------|--------------------------------------------------------|-------------------------------------------|
+ | `replicaCount`                      | Number of replicas                                     | `1`                                       |
+ | `image.repository`                  | The image to run                                       | `lmierzwa/karma`                          |
+-| `image.tag`                         | The image tag to pull                                  | `v0.50`                                   |
++| `image.tag`                         | The image tag to pull                                  | `v0.55`                                   |
+ | `image.pullPolicy`                  | Image pull policy                                      | `IfNotPresent`                            |
+ | `nameOverride`                      | Override name of app                                   | ``                                        |
+ | `fullnameOverride`                  | Override full name of app                              | ``                                        |
+diff --git a/stable/karma/values.yaml b/stable/karma/values.yaml
+index d555b7587..cd510d65e 100644
+--- ./stable/karma/values.yaml
++++ ./stable/karma/values.yaml
+@@ -6,7 +6,7 @@ replicaCount: 1
+ 
+ image:
+   repository: lmierzwa/karma
+-  tag: v0.50
++  tag: v0.55
+   pullPolicy: IfNotPresent
+ 
+ nameOverride: ""
+diff --git a/stable/mariadb/Chart.yaml b/stable/mariadb/Chart.yaml
+index f7e997418..38c4456a2 100644
+--- ./stable/mariadb/Chart.yaml
++++ ./stable/mariadb/Chart.yaml
+@@ -1,7 +1,7 @@
+ apiVersion: v1
+ name: mariadb
+-version: 7.3.6
+-appVersion: 10.3.21
++version: 7.3.7
++appVersion: 10.3.22
+ description: Fast, reliable, scalable, and easy to use open-source relational database system. MariaDB Server is intended for mission-critical, heavy-load production systems as well as for embedding into mass-deployed software. Highly available MariaDB cluster.
+ keywords:
+   - mariadb
+diff --git a/stable/mariadb/deploy.sh b/stable/mariadb/deploy.sh
+new file mode 100755
+index 000000000..24d59eb1c
+--- /dev/null
++++ ./stable/mariadb/deploy.sh
+@@ -0,0 +1,6 @@
++#!/bin/zsh
++SCRIPT=$(realpath "$0")
++SCRIPTPATH=$(dirname "$SCRIPT")
++cd "$SCRIPTPATH"
++
++helm install mariadb ./
+diff --git a/stable/mariadb/values-production.yaml b/stable/mariadb/values-production.yaml
+index 49b0df5db..df9da5b08 100644
+--- ./stable/mariadb/values-production.yaml
++++ ./stable/mariadb/values-production.yaml
+@@ -19,7 +19,7 @@
+ image:
+   registry: docker.io
+   repository: bitnami/mariadb
+-  tag: 10.3.21-debian-10-r0
++  tag: 10.3.22-debian-10-r0
+   ## Specify a imagePullPolicy
+   ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+   ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
+@@ -459,7 +459,7 @@ metrics:
+   image:
+     registry: docker.io
+     repository: bitnami/mysqld-exporter
+-    tag: 0.12.1-debian-10-r0
++    tag: 0.12.1-debian-10-r4
+     pullPolicy: IfNotPresent
+     ## Optionally specify an array of imagePullSecrets.
+     ## Secrets must be manually created in the namespace.
+diff --git a/stable/mariadb/values.yaml b/stable/mariadb/values.yaml
+index 953ec5d70..30375f202 100644
+--- ./stable/mariadb/values.yaml
++++ ./stable/mariadb/values.yaml
+@@ -19,7 +19,7 @@
+ image:
+   registry: docker.io
+   repository: bitnami/mariadb
+-  tag: 10.3.21-debian-10-r0
++  tag: 10.3.22-debian-10-r0
+   ## Specify a imagePullPolicy
+   ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+   ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
+@@ -461,7 +461,7 @@ metrics:
+   image:
+     registry: docker.io
+     repository: bitnami/mysqld-exporter
+-    tag: 0.12.1-debian-10-r0
++    tag: 0.12.1-debian-10-r4
+     pullPolicy: IfNotPresent
+     ## Optionally specify an array of imagePullSecrets.
+     ## Secrets must be manually created in the namespace.
+diff --git a/stable/mongodb-replicaset/Chart.yaml b/stable/mongodb-replicaset/Chart.yaml
+index ba5876b2d..675ba48af 100644
+--- ./stable/mongodb-replicaset/Chart.yaml
++++ ./stable/mongodb-replicaset/Chart.yaml
+@@ -1,7 +1,7 @@
+ apiVersion: v1
+ name: mongodb-replicaset
+ home: https://github.com/mongodb/mongo
+-version: 3.11.3
++version: 3.11.4
+ appVersion: 3.6
+ description: NoSQL document-oriented database that stores JSON-like documents with
+   dynamic schemas, simplifying the integration of data in content-driven applications.
+diff --git a/stable/mongodb-replicaset/templates/_helpers.tpl b/stable/mongodb-replicaset/templates/_helpers.tpl
+index 223ec6604..c4af36cce 100644
+--- ./stable/mongodb-replicaset/templates/_helpers.tpl
++++ ./stable/mongodb-replicaset/templates/_helpers.tpl
+@@ -71,8 +71,8 @@ Create the name for the key secret.
+   {{- end -}}
+ 
+   {{- if .Values.tls.enabled }}
+-  {{- printf "%s?ssl=true&tlsCertificateKeyFile=/work-dir/mongo.pem&tlsCAFile=/ca/tls.crt" $string -}}
++  {{- printf "%s/?ssl=true&tlsCertificateKeyFile=/work-dir/mongo.pem&tlsCAFile=/ca/tls.crt" $string | quote -}}
+   {{- else -}}
+-  {{- printf $string -}}
++  {{- printf $string | quote -}}
+   {{- end -}}
+ {{- end -}}
+diff --git a/stable/newrelic-infrastructure/Chart.yaml b/stable/newrelic-infrastructure/Chart.yaml
+index 5f92e10c8..ccc387a13 100644
+--- ./stable/newrelic-infrastructure/Chart.yaml
++++ ./stable/newrelic-infrastructure/Chart.yaml
+@@ -1,8 +1,8 @@
+ apiVersion: v1
+ description: A Helm chart to deploy the New Relic Infrastructure Agent as a DaemonSet
+ name: newrelic-infrastructure
+-version: 0.13.17
+-appVersion: 1.12.0
++version: 0.13.19
++appVersion: 1.13.2
+ home: https://hub.docker.com/r/newrelic/infrastructure-k8s/
+ source:
+   - https://github.com/kubernetes/kubernetes/tree/master/examples/newrelic-infrastructure
+diff --git a/stable/newrelic-infrastructure/README.md b/stable/newrelic-infrastructure/README.md
+index 7836f38ca..ea02e535e 100644
+--- ./stable/newrelic-infrastructure/README.md
++++ ./stable/newrelic-infrastructure/README.md
+@@ -20,7 +20,7 @@ This chart will deploy the New Relic Infrastructure agent as a Daemonset.
+ | `privileged`                    | Enable privileged mode.                                      | `true`                     |
+ | `image.repository`              | The container to pull.                                       | `newrelic/infrastructure`  |
+ | `image.pullPolicy`              | The pull policy.                                             | `IfNotPresent`             |
+-| `image.tag`                     | The version of the container to pull.                        | `1.12.0`                   |
++| `image.tag`                     | The version of the container to pull.                        | `1.13.2`                   |
+ | `resources`                     | Any resources you wish to assign to the pod.                 | See Resources below        |
+ | `verboseLog`                    | Should the agent log verbosely. (Boolean)                    | `false`                    |
+ | `priorityClassName`             | Scheduling priority of the pod                               | `nil`                      |
+diff --git a/stable/newrelic-infrastructure/values.yaml b/stable/newrelic-infrastructure/values.yaml
+index 743e0db89..bdb0d42f3 100644
+--- ./stable/newrelic-infrastructure/values.yaml
++++ ./stable/newrelic-infrastructure/values.yaml
+@@ -29,15 +29,15 @@ verboseLog: false
+ 
+ image:
+   repository: newrelic/infrastructure-k8s
+-  tag: 1.12.0
++  tag: 1.13.2
+   pullPolicy: IfNotPresent
+ 
+ resources:
+   limits:
+-    memory: 150M
++    memory: 300M
+   requests:
+     cpu: 100m
+-    memory: 30M
++    memory: 150M
+ 
+ privileged: true
+ 
+diff --git a/stable/nfs-server-provisioner/Chart.yaml b/stable/nfs-server-provisioner/Chart.yaml
+index 2fbd13329..f68bc4fef 100644
+--- ./stable/nfs-server-provisioner/Chart.yaml
++++ ./stable/nfs-server-provisioner/Chart.yaml
+@@ -2,12 +2,14 @@ apiVersion: v1
+ appVersion: 2.2.2
+ description: nfs-server-provisioner is an out-of-tree dynamic provisioner for Kubernetes. You can use it to quickly & easily deploy shared storage that works almost anywhere.
+ name: nfs-server-provisioner
+-version: 0.3.3
++version: 0.4.0
+ maintainers:
+ - name: kiall
+   email: kiall@macinnes.ie
+ - name: joaocc
+   email: joaocc-dev@live.com
++- name: naseemkullah
++  email: naseem@transit.app
+ home: https://github.com/kubernetes/charts/tree/master/stable/nfs-server-provisioner
+ sources:
+ - https://github.com/kubernetes-incubator/external-storage/tree/master/nfs
+diff --git a/stable/nfs-server-provisioner/OWNERS b/stable/nfs-server-provisioner/OWNERS
+index 9aa78a366..e14527553 100644
+--- ./stable/nfs-server-provisioner/OWNERS
++++ ./stable/nfs-server-provisioner/OWNERS
+@@ -1,4 +1,6 @@
+ approvers:
+ - kiall
++- naseemkullah
+ reviewers:
+ - kiall
++- naseemkullah
+diff --git a/stable/nfs-server-provisioner/README.md b/stable/nfs-server-provisioner/README.md
+index c46f145ab..6d0478e0a 100644
+--- ./stable/nfs-server-provisioner/README.md
++++ ./stable/nfs-server-provisioner/README.md
+@@ -54,6 +54,7 @@ their default values.
+ 
+ | Parameter                      | Description                                                                                                     | Default                                                  |
+ |:-------------------------------|:----------------------------------------------------------------------------------------------------------------|:---------------------------------------------------------|
++| `extraArgs` | [Additional command line arguments](https://github.com/kubernetes-incubator/external-storage/blob/master/nfs/docs/deployment.md#arguments) | `{}`
+ | `imagePullSecrets`             | Specify image pull secrets                                                                                      | `nil` (does not add image pull secrets to deployed pods) |
+ | `image.repository`             | The image repository to pull from                                                                               | `quay.io/kubernetes_incubator/nfs-provisioner`           |
+ | `image.tag`                    | The image tag to pull from                                                                                      | `v2.2.2`                                                 |
+diff --git a/stable/nfs-server-provisioner/deploy.sh b/stable/nfs-server-provisioner/deploy.sh
+new file mode 100755
+index 000000000..e8ab19186
+--- /dev/null
++++ ./stable/nfs-server-provisioner/deploy.sh
+@@ -0,0 +1,6 @@
++#!/bin/zsh
++SCRIPT=$(realpath "$0")
++SCRIPTPATH=$(dirname "$SCRIPT")
++cd "$SCRIPTPATH"
++
++helm install nfs-server-provisioner ./ --set persistence.enabled=true,persistence.size=10Gi
+diff --git a/stable/nfs-server-provisioner/templates/statefulset.yaml b/stable/nfs-server-provisioner/templates/statefulset.yaml
+index 619b258b0..a872ca78c 100644
+--- ./stable/nfs-server-provisioner/templates/statefulset.yaml
++++ ./stable/nfs-server-provisioner/templates/statefulset.yaml
+@@ -50,6 +50,9 @@ spec:
+                 - SYS_RESOURCE
+           args:
+             - "-provisioner={{ template "nfs-provisioner.provisionerName" . }}"
++          {{- range $key, $value := .Values.extraArgs }}
++            - "-{{ $key }}={{ $value }}"
++          {{- end }}
+           env:
+             - name: POD_IP
+               valueFrom:
+diff --git a/stable/nfs-server-provisioner/values.yaml b/stable/nfs-server-provisioner/values.yaml
+index 02864a030..3e6011431 100644
+--- ./stable/nfs-server-provisioner/values.yaml
++++ ./stable/nfs-server-provisioner/values.yaml
+@@ -11,6 +11,11 @@ image:
+   tag: v2.2.2
+   pullPolicy: IfNotPresent
+ 
++# For a list of available arguments
++# Please see https://github.com/kubernetes-incubator/external-storage/blob/master/nfs/docs/deployment.md#arguments
++extraArgs: {}
++  # device-based-fsids: false
++
+ service:
+   type: ClusterIP
+ 
+diff --git a/stable/nginx-ingress/Chart.yaml b/stable/nginx-ingress/Chart.yaml
+index 620f03a81..3e67b8ef8 100644
+--- ./stable/nginx-ingress/Chart.yaml
++++ ./stable/nginx-ingress/Chart.yaml
+@@ -1,7 +1,7 @@
+ apiVersion: v1
+ name: nginx-ingress
+-version: 1.29.5
+-appVersion: 0.27.1
++version: 1.29.6
++appVersion: 0.28.0
+ home: https://github.com/kubernetes/ingress-nginx
+ description: An nginx Ingress controller that uses ConfigMap to store the nginx configuration.
+ icon: https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Nginx_logo.svg/500px-Nginx_logo.svg.png
+diff --git a/stable/nginx-ingress/README.md b/stable/nginx-ingress/README.md
+index 7ff791d95..87351c8ae 100644
+--- ./stable/nginx-ingress/README.md
++++ ./stable/nginx-ingress/README.md
+@@ -48,7 +48,7 @@ Parameter | Description | Default
+ --- | --- | ---
+ `controller.name` | name of the controller component | `controller`
+ `controller.image.repository` | controller container image repository | `quay.io/kubernetes-ingress-controller/nginx-ingress-controller`
+-`controller.image.tag` | controller container image tag | `0.27.1`
++`controller.image.tag` | controller container image tag | `0.28.0`
+ `controller.image.pullPolicy` | controller container image pull policy | `IfNotPresent`
+ `controller.image.runAsUser` | User ID of the controller process. Value depends on the Linux distribution used inside of the container image. | `101`
+ `controller.containerPort.http` | The port that the controller container listens on for http connections. | `80`
+diff --git a/stable/nginx-ingress/values.yaml b/stable/nginx-ingress/values.yaml
+index 62bcc0935..3e58fdd71 100644
+--- ./stable/nginx-ingress/values.yaml
++++ ./stable/nginx-ingress/values.yaml
+@@ -5,7 +5,7 @@ controller:
+   name: controller
+   image:
+     repository: quay.io/kubernetes-ingress-controller/nginx-ingress-controller
+-    tag: "0.27.1"
++    tag: "0.28.0"
+     pullPolicy: IfNotPresent
+     # www-data -> uid 101
+     runAsUser: 101
+diff --git a/stable/node-problem-detector/Chart.yaml b/stable/node-problem-detector/Chart.yaml
+index e95922ac5..0440fcc4c 100644
+--- ./stable/node-problem-detector/Chart.yaml
++++ ./stable/node-problem-detector/Chart.yaml
+@@ -1,6 +1,6 @@
+ apiVersion: v1
+ name: node-problem-detector
+-version: "1.6.2"
++version: "1.6.3"
+ appVersion: v0.7.0
+ home: https://github.com/kubernetes/node-problem-detector
+ description: Installs the node-problem-detector daemonset for monitoring extra attributes on nodes
+diff --git a/stable/node-problem-detector/README.md b/stable/node-problem-detector/README.md
+index f62841635..fb14f889e 100644
+--- ./stable/node-problem-detector/README.md
++++ ./stable/node-problem-detector/README.md
+@@ -55,7 +55,7 @@ The following table lists the configurable parameters for this chart and their d
+ | `settings.prometheus_port`            | Prometheus exporter port                   | `20257`                                                      |
+ | `serviceAccount.create`               | Whether a ServiceAccount should be created | `true`                                                       |
+ | `serviceAccount.name`                 | Name of the ServiceAccount to create       | Generated value from template                                |
+-| `tolerations`                         | Optional daemonset tolerations             | `[]`                                                         |
++| `tolerations`                         | Optional daemonset tolerations             | `["effect: NoSchedule,operator: Exists"]`                                                         |
+ | `nodeSelector`                        | Optional daemonset nodeSelector            | `{}`                                                         |
+ | `env`                                 | Optional daemonset environment variables   | `[]`                                                         |
+ 
+diff --git a/stable/node-problem-detector/values.yaml b/stable/node-problem-detector/values.yaml
+index 655cd3648..5ef7e913e 100644
+--- ./stable/node-problem-detector/values.yaml
++++ ./stable/node-problem-detector/values.yaml
+@@ -61,7 +61,9 @@ resources: {}
+ 
+ annotations: {}
+ 
+-tolerations: []
++tolerations:
++  - effect: NoSchedule
++    operator: Exists
+ 
+ serviceAccount:
+   # Specifies whether a ServiceAccount should be created
+diff --git a/stable/oauth2-proxy/Chart.yaml b/stable/oauth2-proxy/Chart.yaml
+index 3292813d9..d06e6d05d 100644
+--- ./stable/oauth2-proxy/Chart.yaml
++++ ./stable/oauth2-proxy/Chart.yaml
+@@ -1,5 +1,5 @@
+ name: oauth2-proxy
+-version: 2.1.1
++version: 2.2.1
+ apiVersion: v1
+ appVersion: 4.0.0
+ home: https://pusher.github.io/oauth2_proxy/
+diff --git a/stable/oauth2-proxy/README.md b/stable/oauth2-proxy/README.md
+index 98ae78898..2fd3c4a38 100644
+--- ./stable/oauth2-proxy/README.md
++++ ./stable/oauth2-proxy/README.md
+@@ -107,6 +107,7 @@ Parameter | Description | Default
+ `tolerations` | list of node taints to tolerate | `[]`
+ `securityContext.enabled` | enable Kubernetes security context | `false`
+ `securityContext.runAsNonRoot` | make sure that the container runs as a non-root user | `true`
++`proxyVarsAsSecrets` | choose between environment values or secrets for setting up OAUTH2_PROXY variables. When set to false, remember to add the variables OAUTH2_PROXY_CLIENT_ID, OAUTH2_PROXY_CLIENT_SECRET, OAUTH2_PROXY_COOKIE_SECRET in extraEnv | `true`
+ 
+ 
+ Specify each parameter using the `--set key=value[,key=value]` argument to `helm install`. For example,
+diff --git a/stable/oauth2-proxy/templates/deployment.yaml b/stable/oauth2-proxy/templates/deployment.yaml
+index 76991a1ae..312e5f44c 100644
+--- ./stable/oauth2-proxy/templates/deployment.yaml
++++ ./stable/oauth2-proxy/templates/deployment.yaml
+@@ -65,6 +65,7 @@ spec:
+         {{- if .Values.htpasswdFile.enabled }}
+           - --htpasswd-file=/etc/oauth2_proxy/htpasswd/users.txt
+         {{- end }}
++        {{- if .Values.proxyVarsAsSecrets }}
+         env:
+         - name: OAUTH2_PROXY_CLIENT_ID
+           valueFrom:
+@@ -81,6 +82,7 @@ spec:
+             secretKeyRef:
+               name:  {{ template "oauth2-proxy.secretName" . }}
+               key: cookie-secret
++        {{- end }}
+         {{- if .Values.extraEnv }}
+ {{ toYaml .Values.extraEnv | indent 8 }}
+         {{- end }}
+diff --git a/stable/oauth2-proxy/templates/secret.yaml b/stable/oauth2-proxy/templates/secret.yaml
+index 858fe9f41..89134fa0d 100644
+--- ./stable/oauth2-proxy/templates/secret.yaml
++++ ./stable/oauth2-proxy/templates/secret.yaml
+@@ -1,4 +1,4 @@
+-{{- if not .Values.config.existingSecret }}
++{{- if and (not .Values.config.existingSecret) (.Values.proxyVarsAsSecrets) }}
+ apiVersion: v1
+ kind: Secret
+ metadata:
+diff --git a/stable/oauth2-proxy/values.yaml b/stable/oauth2-proxy/values.yaml
+index 0b2b3df11..a21d753c9 100644
+--- ./stable/oauth2-proxy/values.yaml
++++ ./stable/oauth2-proxy/values.yaml
+@@ -116,6 +116,9 @@ tolerations: []
+ # Ref: https://kubernetes.io/docs/user-guide/node-selection/
+ nodeSelector: {}
+ 
++# Whether to use secrets instead of environment values for setting up OAUTH2_PROXY variables
++proxyVarsAsSecrets: true
++
+ # Configure Kubernetes liveness and readiness probes.
+ # Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/
+ # Disable both when deploying with Istio 1.0 mTLS. https://istio.io/help/faq/security/#k8s-health-checks
+diff --git a/stable/phpmyadmin/Chart.yaml b/stable/phpmyadmin/Chart.yaml
+index dec7fd51a..895ae2363 100644
+--- ./stable/phpmyadmin/Chart.yaml
++++ ./stable/phpmyadmin/Chart.yaml
+@@ -1,6 +1,6 @@
+ apiVersion: v1
+ name: phpmyadmin
+-version: 4.2.10
++version: 4.2.11
+ appVersion: 5.0.1
+ description: phpMyAdmin is an mysql administration frontend
+ keywords:
+diff --git a/stable/phpmyadmin/templates/NOTES.txt b/stable/phpmyadmin/templates/NOTES.txt
+index bafd48e8f..dd4fccd23 100644
+--- ./stable/phpmyadmin/templates/NOTES.txt
++++ ./stable/phpmyadmin/templates/NOTES.txt
+@@ -50,6 +50,8 @@ $ helm upgrade {{.Release.Name}} stable/phpmyadmin --set db.host=mydb
+ 
+ {{end}}
+ 
++{{- include "phpmyadmin.validateValues" . -}}
++
+ {{- if and (contains "bitnami/" .Values.image.repository) (not (.Values.image.tag | toString | regexFind "-r\\d+$|sha256:")) }}
+ 
+ WARNING: Rolling tag detected ({{ .Values.image.repository }}:{{ .Values.image.tag }}), please note that it is strongly recommended to avoid using rolling tags in a production environment.
+diff --git a/stable/phpmyadmin/templates/_helpers.tpl b/stable/phpmyadmin/templates/_helpers.tpl
+index 14537cfb1..ea6e506a3 100644
+--- ./stable/phpmyadmin/templates/_helpers.tpl
++++ ./stable/phpmyadmin/templates/_helpers.tpl
+@@ -127,3 +127,28 @@ imagePullSecrets:
+ {{- end }}
+ {{- end -}}
+ {{- end -}}
++
++
++{{/*
++Compile all warnings into a single message, and call fail.
++*/}}
++{{- define "phpmyadmin.validateValues" -}}
++{{- $messages := list -}}
++{{- $messages := append $messages (include "phpmyadmin.validateValues.db.ssl" .) -}}
++{{- $messages := without $messages "" -}}
++{{- $message := join "\n" $messages -}}
++
++{{- if $message -}}
++{{-   printf "\nVALUES VALIDATION:\n%s" $message | fail -}}
++{{- end -}}
++{{- end -}}
++
++{{/* Validate values of phpMyAdmin - must provide a valid database ssl configuration */}}
++{{- define "phpmyadmin.validateValues.db.ssl" -}}
++{{- if and .Values.db.enableSsl (empty .Values.db.ssl.clientKey) (empty .Values.db.ssl.clientCertificate) (empty .Values.db.ssl.caCertificate) -}}
++phpMyAdmin: db.ssl
++    Invalid database ssl configuration. You enabled SSL for the connection
++    between phpMyAdmin and the database but no key/certificates were provided
++    (--set db.ssl.clientKey="xxxx", --set db.ssl.clientCertificate="yyyy")
++{{- end -}}
++{{- end -}}
+diff --git a/stable/phpmyadmin/templates/certs.yaml b/stable/phpmyadmin/templates/certs.yaml
+index 45a656005..191b873e3 100644
+--- ./stable/phpmyadmin/templates/certs.yaml
++++ ./stable/phpmyadmin/templates/certs.yaml
+@@ -10,10 +10,13 @@ metadata:
+     heritage: {{ .Release.Service }}
+ type: Opaque
+ data:
+-  server_key.pem:
+-    {{ required "A valid .Values.db.ssl.clientKey entry required!" .Values.db.ssl.clientKey | b64enc | quote }}
+-  server_certificate.pem:
+-    {{ required "A valid .Values.db.ssl.clientCertificate entry required!" .Values.db.ssl.clientCertificate | b64enc | quote }}
+-  ca_certificate.pem:
+-    {{ required "A valid .Values.db.ssl.caCertificate entry required!" .Values.db.ssl.caCertificate | b64enc | quote }}
++  {{- if not (empty .Values.db.ssl.clientKey) }}
++  server_key.pem: {{ .Values.db.ssl.clientKey | b64enc | quote }}
++  {{- end }}
++  {{- if not (empty .Values.db.ssl.clientCertificate) }}
++  server_certificate.pem: {{ .Values.db.ssl.clientCertificate | b64enc | quote }}
++  {{- end }}
++  {{- if not (empty .Values.db.ssl.caCertificate) }}
++  ca_certificate.pem: {{ .Values.db.ssl.caCertificate | b64enc | quote }}
++  {{- end }}
+ {{- end }}
+diff --git a/stable/phpmyadmin/templates/deployment.yaml b/stable/phpmyadmin/templates/deployment.yaml
+index c034da6d8..639e98e7d 100644
+--- ./stable/phpmyadmin/templates/deployment.yaml
++++ ./stable/phpmyadmin/templates/deployment.yaml
+@@ -75,12 +75,18 @@ spec:
+             - name: DATABASE_ENABLE_SSL
+               value: {{ ternary "yes" "no" .Values.db.enableSsl | quote }}
+             {{- if .Values.db.enableSsl }}
++            {{- if not (empty .Values.db.ssl.clientKey) }}
+             - name: DATABASE_SSL_KEY
+               value: "/db_certs/server_key.pem"
++            {{- end }}
++            {{- if not (empty .Values.db.ssl.clientCertificate) }}
+             - name: DATABASE_SSL_CERT
+               value: "/db_certs/server_certificate.pem"
++            {{- end }}
++            {{- if not (empty .Values.db.ssl.caCertificate) }}
+             - name: DATABASE_SSL_CA
+               value: "/db_certs/ca_certificate.pem"
++            {{- end }}
+             {{- if .Values.db.ssl.ciphers }}
+             - name: DATABASE_SSL_CIPHERS
+               values: {{ .Values.db.ssl.ciphers | quote }}
+@@ -143,10 +149,16 @@ spec:
+           secret:
+             secretName: {{ template "phpmyadmin.fullname" . }}-certs
+             items:
++              {{- if not (empty .Values.db.ssl.clientKey) }}
+               - key: server_key.pem
+                 path: server_key.pem
++              {{- end }}
++              {{- if not (empty .Values.db.ssl.clientCertificate) }}
+               - key: server_certificate.pem
+                 path: server_certificate.pem
++              {{- end }}
++              {{- if not (empty .Values.db.ssl.caCertificate) }}
+               - key: ca_certificate.pem
+                 path: ca_certificate.pem
+               {{- end }}
++{{- end }}
+diff --git a/stable/postgresql/Chart.yaml b/stable/postgresql/Chart.yaml
+index 3f89574d9..1a39830c8 100644
+--- ./stable/postgresql/Chart.yaml
++++ ./stable/postgresql/Chart.yaml
+@@ -1,6 +1,6 @@
+ apiVersion: v1
+ name: postgresql
+-version: 8.1.5
++version: 8.2.1
+ appVersion: 11.6.0
+ description: Chart for PostgreSQL, an object-relational database management system (ORDBMS) with an emphasis on extensibility and on standards-compliance.
+ keywords:
+diff --git a/stable/postgresql/README.md b/stable/postgresql/README.md
+index d3a66f90a..90402376b 100644
+--- ./stable/postgresql/README.md
++++ ./stable/postgresql/README.md
+@@ -100,6 +100,7 @@ The following tables lists the configurable parameters of the PostgreSQL chart a
+ | `postgresqlDatabase`                          | PostgreSQL database                                                                                                                                                       | `nil`                                                         |
+ | `postgresqlDataDir`                           | PostgreSQL data dir folder                                                                                                                                                | `/bitnami/postgresql` (same value as persistence.mountPath)   |
+ | `extraEnv`                                    | Any extra environment variables you would like to pass on to the pod. The value is evaluated as a template.                                                               | `[]`                                                          |
++| `extraEnvVarsCM`                              | Name of a Config Map containing extra environment variables you would like to pass on to the pod.                                                                         | `nil`                                                         |
+ | `postgresqlInitdbArgs`                        | PostgreSQL initdb extra arguments                                                                                                                                         | `nil`                                                         |
+ | `postgresqlInitdbWalDir`                      | PostgreSQL location for transaction log                                                                                                                                   | `nil`                                                         |
+ | `postgresqlConfiguration`                     | Runtime Config Parameters                                                                                                                                                 | `nil`                                                         |
+diff --git a/stable/postgresql/templates/statefulset.yaml b/stable/postgresql/templates/statefulset.yaml
+index 7b1b4cf97..4b8b7913f 100644
+--- ./stable/postgresql/templates/statefulset.yaml
++++ ./stable/postgresql/templates/statefulset.yaml
+@@ -236,6 +236,11 @@ spec:
+             - name: POSTGRESQL_LDAP_URL
+               value: {{ .Values.ldap.url }}
+             {{- end}}
++          {{- if .Values.extraEnvVarsCM }}
++          envFrom:
++            - configMapRef:
++                name: {{ .Values.extraEnvVarsCM }}
++          {{- end }}
+           ports:
+             - name: tcp-postgresql
+               containerPort: {{ template "postgresql.port" . }}
+diff --git a/stable/postgresql/values-production.yaml b/stable/postgresql/values-production.yaml
+index d5a2e05eb..24d92c8ad 100644
+--- ./stable/postgresql/values-production.yaml
++++ ./stable/postgresql/values-production.yaml
+@@ -15,7 +15,7 @@ global:
+ image:
+   registry: docker.io
+   repository: bitnami/postgresql
+-  tag: 11.6.0-debian-10-r0
++  tag: 11.6.0-debian-10-r5
+   ## Specify a imagePullPolicy
+   ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+   ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
+@@ -138,6 +138,10 @@ postgresqlDataDir: /bitnami/postgresql/data
+ # extraEnv:
+ extraEnv: []
+ 
++## Name of a ConfigMap containing extra env vars
++##
++# extraEnvVarsCM:
++
+ ## Specify extra initdb args
+ ## ref: https://github.com/bitnami/bitnami-docker-postgresql/blob/master/README.md
+ ##
+@@ -431,7 +435,7 @@ metrics:
+   image:
+     registry: docker.io
+     repository: bitnami/postgres-exporter
+-    tag: 0.8.0-debian-10-r0
++    tag: 0.8.0-debian-10-r4
+     pullPolicy: IfNotPresent
+     ## Optionally specify an array of imagePullSecrets.
+     ## Secrets must be manually created in the namespace.
+diff --git a/stable/postgresql/values.yaml b/stable/postgresql/values.yaml
+index 3883a2641..deaa99ba4 100644
+--- ./stable/postgresql/values.yaml
++++ ./stable/postgresql/values.yaml
+@@ -15,7 +15,7 @@ global:
+ image:
+   registry: docker.io
+   repository: bitnami/postgresql
+-  tag: 11.6.0-debian-10-r0
++  tag: 11.6.0-debian-10-r5
+   ## Specify a imagePullPolicy
+   ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+   ## ref: http://kubernetes.io/docs/user-guide/images/#pre-pulling-images
+@@ -138,6 +138,10 @@ postgresqlDataDir: /bitnami/postgresql/data
+ # extraEnv:
+ extraEnv: []
+ 
++## Name of a ConfigMap containing extra env vars
++##
++# extraEnvVarsCM:
++
+ ## Specify extra initdb args
+ ## ref: https://github.com/bitnami/bitnami-docker-postgresql/blob/master/README.md
+ ##
+@@ -439,7 +443,7 @@ metrics:
+   image:
+     registry: docker.io
+     repository: bitnami/postgres-exporter
+-    tag: 0.8.0-debian-10-r0
++    tag: 0.8.0-debian-10-r4
+     pullPolicy: IfNotPresent
+     ## Optionally specify an array of imagePullSecrets.
+     ## Secrets must be manually created in the namespace.
+diff --git a/stable/prometheus-operator/Chart.yaml b/stable/prometheus-operator/Chart.yaml
+index bb585ed76..2dfebe8a1 100644
+--- ./stable/prometheus-operator/Chart.yaml
++++ ./stable/prometheus-operator/Chart.yaml
+@@ -12,7 +12,7 @@ sources:
+   - https://github.com/coreos/kube-prometheus
+   - https://github.com/coreos/prometheus-operator
+   - https://coreos.com/operators/prometheus
+-version: 8.5.14
++version: 8.5.15
+ appVersion: 0.34.0
+ tillerVersion: ">=2.12.0"
+ home: https://github.com/coreos/prometheus-operator
+diff --git a/stable/prometheus-operator/README.md b/stable/prometheus-operator/README.md
+index 45a3b4beb..9596a0e9f 100644
+--- ./stable/prometheus-operator/README.md
++++ ./stable/prometheus-operator/README.md
+@@ -260,6 +260,7 @@ The following tables list the configurable parameters of the prometheus-operator
+ | `prometheus.prometheusSpec.additionalAlertRelabelConfigs` | AdditionalAlertRelabelConfigs allows specifying additional Prometheus alert relabel configurations. Alert relabel configurations specified are appended to the configurations generated by the Prometheus Operator. Alert relabel configurations specified must have the form as specified in the official Prometheus documentation: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#alert_relabel_configs. As alert relabel configs are appended, the user is responsible to make sure it is valid. Note that using this feature may expose the possibility to break upgrades of Prometheus. It is advised to review Prometheus release notes to ensure that no incompatible alert relabel configs are going to break Prometheus after the upgrade. | `[]` |
+ | `prometheus.prometheusSpec.additionalScrapeConfigsExternal` | Enable additional scrape configs that are managed externally to this chart. This option requires a secret in the same namespace as Prometheus with the name, `prometheus-operator-prometheus-scrape-confg` and a key of `additional-scrape-configs.yaml`. Note that the prometheus will fail to provision if the correct secret does not exist. | `false` |
+ | `prometheus.prometheusSpec.additionalScrapeConfigs` | AdditionalScrapeConfigs allows specifying additional Prometheus scrape configurations. Scrape configurations are appended to the configurations generated by the Prometheus Operator. Job configurations must have the form as specified in the official Prometheus documentation: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#<scrape_config>. As scrape configs are appended, the user is responsible to make sure it is valid. Note that using this feature may expose the possibility to break upgrades of Prometheus. It is advised to review Prometheus release notes to ensure that no incompatible scrape configs are going to break Prometheus after the upgrade. | `{}` |
++| `prometheus.prometheusSpec.additionalPrometheusSecretsAnnotations` | additionalPrometheusSecretsAnnotations allows to add annotations to the kubernetes secret. This can be useful when deploying via spinnaker to disable versioning on the secret, strategy.spinnaker.io/versioned: 'false' | `{}` |
+ | `prometheus.prometheusSpec.affinity` | Assign custom affinity rules to the prometheus instance https://kubernetes.io/docs/concepts/configuration/assign-pod-node/ | `{}` |
+ | `prometheus.prometheusSpec.alertingEndpoints` | Alertmanagers to which alerts will be sent https://github.com/coreos/prometheus-operator/blob/master/Documentation/api.md#alertmanagerendpoints Default configuration will connect to the alertmanager deployed as part of this release | `[]` |
+ | `prometheus.prometheusSpec.configMaps` | ConfigMaps is a list of ConfigMaps in the same namespace as the Prometheus object, which shall be mounted into the Prometheus Pods. The ConfigMaps are mounted into /etc/prometheus/configmaps/ | `[]` |
+diff --git a/stable/prometheus-operator/templates/prometheus/additionalAlertRelabelConfigs.yaml b/stable/prometheus-operator/templates/prometheus/additionalAlertRelabelConfigs.yaml
+index ca0e3e293..5e19878a0 100644
+--- ./stable/prometheus-operator/templates/prometheus/additionalAlertRelabelConfigs.yaml
++++ ./stable/prometheus-operator/templates/prometheus/additionalAlertRelabelConfigs.yaml
+@@ -4,6 +4,10 @@ kind: Secret
+ metadata:
+   name: {{ template "prometheus-operator.fullname" . }}-prometheus-am-relabel-confg
+   namespace: {{ $.Release.Namespace }}
++{{- if .Values.prometheus.prometheusSpec.additionalPrometheusSecretsAnnotations }}
++  annotations:
++{{ toYaml .Values.prometheus.prometheusSpec.additionalPrometheusSecretsAnnotations | indent 4 }}
++{{- end }}
+   labels:
+     app: {{ template "prometheus-operator.name" . }}-prometheus-am-relabel-confg
+ {{ include "prometheus-operator.labels" . | indent 4 }}
+diff --git a/stable/prometheus-operator/templates/prometheus/additionalAlertmanagerConfigs.yaml b/stable/prometheus-operator/templates/prometheus/additionalAlertmanagerConfigs.yaml
+index 14c429593..b495f8ad1 100644
+--- ./stable/prometheus-operator/templates/prometheus/additionalAlertmanagerConfigs.yaml
++++ ./stable/prometheus-operator/templates/prometheus/additionalAlertmanagerConfigs.yaml
+@@ -4,6 +4,10 @@ kind: Secret
+ metadata:
+   name: {{ template "prometheus-operator.fullname" . }}-prometheus-am-confg
+   namespace: {{ $.Release.Namespace }}
++{{- if .Values.prometheus.prometheusSpec.additionalPrometheusSecretsAnnotations }}
++  annotations:
++{{ toYaml .Values.prometheus.prometheusSpec.additionalPrometheusSecretsAnnotations | indent 4 }}
++{{- end }}
+   labels:
+     app: {{ template "prometheus-operator.name" . }}-prometheus-am-confg
+ {{ include "prometheus-operator.labels" . | indent 4 }}
+diff --git a/stable/prometheus-operator/templates/prometheus/additionalScrapeConfigs.yaml b/stable/prometheus-operator/templates/prometheus/additionalScrapeConfigs.yaml
+index 84788fd68..66efb095f 100644
+--- ./stable/prometheus-operator/templates/prometheus/additionalScrapeConfigs.yaml
++++ ./stable/prometheus-operator/templates/prometheus/additionalScrapeConfigs.yaml
+@@ -3,7 +3,11 @@ apiVersion: v1
+ kind: Secret
+ metadata:
+   name: {{ template "prometheus-operator.fullname" . }}-prometheus-scrape-confg
+-  namespace: {{ $.Release.Namespace }}
++  namespace: {{ .Release.Namespace }}
++{{- if .Values.prometheus.prometheusSpec.additionalPrometheusSecretsAnnotations }}
++  annotations:
++{{ toYaml .Values.prometheus.prometheusSpec.additionalPrometheusSecretsAnnotations | indent 4 }}
++{{- end }}
+   labels:
+     app: {{ template "prometheus-operator.name" . }}-prometheus-scrape-confg
+ {{ include "prometheus-operator.labels" . | indent 4 }}
+diff --git a/stable/prometheus-operator/values.yaml b/stable/prometheus-operator/values.yaml
+index 9e6720dd7..a50f15245 100644
+--- ./stable/prometheus-operator/values.yaml
++++ ./stable/prometheus-operator/values.yaml
+@@ -1675,6 +1675,9 @@ prometheus:
+     #   - regex: (kubernetes_io_hostname|failure_domain_beta_kubernetes_io_region|beta_kubernetes_io_os|beta_kubernetes_io_arch|beta_kubernetes_io_instance_type|failure_domain_beta_kubernetes_io_zone)
+     #     action: labeldrop
+ 
++    ## additionalPrometheusSecretsAnnotations allows to add annotations to the kubernetes secret. This can be useful
++    ## when deploying via spinnaker to disable versioning on the secret, strategy.spinnaker.io/versioned: 'false'
++    additionalPrometheusSecretsAnnotations: {}
+ 
+     ## AdditionalAlertManagerConfigs allows for manual configuration of alertmanager jobs in the form as specified
+     ## in the official Prometheus documentation https://prometheus.io/docs/prometheus/latest/configuration/configuration/#<alertmanager_config>.
+diff --git a/stable/redmine/Chart.yaml b/stable/redmine/Chart.yaml
+index abac88c37..01038fb95 100644
+--- ./stable/redmine/Chart.yaml
++++ ./stable/redmine/Chart.yaml
+@@ -1,6 +1,6 @@
+ apiVersion: v1
+ name: redmine
+-version: 14.1.5
++version: 14.1.6
+ appVersion: 4.1.0
+ description: A flexible project management web application.
+ keywords:
+diff --git a/stable/redmine/templates/deployment.yaml b/stable/redmine/templates/deployment.yaml
+index 52e539639..94630e614 100644
+--- ./stable/redmine/templates/deployment.yaml
++++ ./stable/redmine/templates/deployment.yaml
+@@ -37,7 +37,7 @@ spec:
+           {{- end }}
+           env:
+             {{- if .Values.extraVars }}
+-            {{- toYaml .Values.extraVars | indent 12 }}
++            {{- toYaml .Values.extraVars | nindent 12 }}
+             {{- end }}
+             {{- if eq .Values.databaseType "mariadb" }}
+             - name: REDMINE_DB_MYSQL
+diff --git a/stable/sonatype-nexus/Chart.yaml b/stable/sonatype-nexus/Chart.yaml
+index dc2bc4a20..95323c954 100644
+--- ./stable/sonatype-nexus/Chart.yaml
++++ ./stable/sonatype-nexus/Chart.yaml
+@@ -1,6 +1,6 @@
+ apiVersion: v1
+ name: sonatype-nexus
+-version: 1.21.4
++version: 1.22.0
+ appVersion: 3.20.1-01
+ description: Sonatype Nexus is an open source repository manager
+ keywords:
+diff --git a/stable/sonatype-nexus/README.md b/stable/sonatype-nexus/README.md
+index 386ba9c1f..cf64e02f1 100644
+--- ./stable/sonatype-nexus/README.md
++++ ./stable/sonatype-nexus/README.md
+@@ -150,6 +150,9 @@ The following table lists the configurable parameters of the Nexus chart and the
+ | `service.loadBalancerSourceRanges`          | Service LoadBalancer source IP whitelist | `nil`                              |
+ | `service.targetPort`                        | Service port                     | `nil`                                      |
+ | `service.port`                              | Port for exposing service        | `nil`                                      |
++| `serviceAccount.create`                     | Automatically create a service account | `true`                               |
++| `serviceAccount.name`                       | Service account to use 				   | `nil`								  |
++| `serviceAccount.annotations`                | Service account annotations			   | `nil`	   							  |
+ | `route.enabled`         | Set to true to create route for additional service | `false` |
+ | `route.name`            | Name of route                                      | `docker` |
+ | `route.portName`        | Target port name of service                        | `docker` |
+diff --git a/stable/sonatype-nexus/templates/deployment-statefulset.yaml b/stable/sonatype-nexus/templates/deployment-statefulset.yaml
+index 1c3028a0e..8eca07bb1 100644
+--- ./stable/sonatype-nexus/templates/deployment-statefulset.yaml
++++ ./stable/sonatype-nexus/templates/deployment-statefulset.yaml
+@@ -59,6 +59,11 @@ spec:
+       imagePullSecrets:
+         - name: {{ .Values.nexus.imagePullSecret }}
+       {{- end }}
++      {{- if .Values.serviceAccount.create }}
++      serviceAccountName: {{ template "nexus.fullname" . }}
++      {{- else }}
++      serviceAccountName: {{ .Values.serviceAccount.name | quote }}
++      {{- end }}
+       containers:
+         - name: nexus
+           image: {{ .Values.nexus.imageName }}:{{ .Values.nexus.imageTag }}
+diff --git a/stable/sonatype-nexus/templates/serviceaccount.yaml b/stable/sonatype-nexus/templates/serviceaccount.yaml
+new file mode 100644
+index 000000000..72dc7b566
+--- /dev/null
++++ ./stable/sonatype-nexus/templates/serviceaccount.yaml
+@@ -0,0 +1,9 @@
++{{- if .Values.serviceAccount.create }}
++apiVersion: v1
++kind: ServiceAccount
++metadata:
++  name: {{ template "nexus.fullname" . }}
++  {{- if .Values.serviceAccount.annotations }}
++  annotations: {{ toYaml .Values.serviceAccount.annotations | nindent 4 }}
++  {{- end }}
++{{- end }}
+diff --git a/stable/sonatype-nexus/values.yaml b/stable/sonatype-nexus/values.yaml
+index 15c2d994a..67def8b0e 100644
+--- ./stable/sonatype-nexus/values.yaml
++++ ./stable/sonatype-nexus/values.yaml
+@@ -154,6 +154,14 @@ nexusBackup:
+     # pdName: nexus-backup-disk
+     # fsType: ext4
+ 
++serviceAccount:
++  # Specifies whether a service account should be created
++  create: true
++  # The name of the service account to use.
++  # If not set and create is true, a name is generated using the fullname template
++  name:
++  annotations: {}
++
+ ingress:
+   enabled: false
+   path: /
+diff --git a/stable/spring-cloud-data-flow/Chart.yaml b/stable/spring-cloud-data-flow/Chart.yaml
+index 8a9802f1d..72cbe25e6 100644
+--- ./stable/spring-cloud-data-flow/Chart.yaml
++++ ./stable/spring-cloud-data-flow/Chart.yaml
+@@ -1,8 +1,8 @@
+ apiVersion: v1
+ description: Toolkit for building data processing pipelines.
+ name: spring-cloud-data-flow
+-version: 2.5.2
+-appVersion: 2.3.0.RELEASE
++version: 2.5.3
++appVersion: 2.3.1.RELEASE
+ home: http://cloud.spring.io/spring-cloud-dataflow/
+ sources:
+ - https://github.com/spring-cloud/spring-cloud-dataflow
+diff --git a/stable/spring-cloud-data-flow/README.md b/stable/spring-cloud-data-flow/README.md
+index eefdaea31..257fd3cdb 100644
+--- ./stable/spring-cloud-data-flow/README.md
++++ ./stable/spring-cloud-data-flow/README.md
+@@ -111,7 +111,7 @@ The following tables list the configurable parameters and their default values.
+ 
+ | Parameter                               | Description                                                        | Default          |
+ | --------------------------------------- | ------------------------------------------------------------------ | ---------------- |
+-| server.version                          | The version/tag of the Data Flow server                            | 2.3.0.RELEASE
++| server.version                          | The version/tag of the Data Flow server                            | 2.3.1.RELEASE
+ | server.imagePullPolicy                  | The imagePullPolicy of the Data Flow server                        | IfNotPresent
+ | server.service.type                     | The service type for the Data Flow server                          | LoadBalancer
+ | server.service.annotations              | Extra annotations for service resource                             | {}
+@@ -126,7 +126,7 @@ The following tables list the configurable parameters and their default values.
+ 
+ | Parameter                         | Description                                                      | Default          |
+ | --------------------------------- | ---------------------------------------------------------------- | ---------------- |
+-| skipper.version                   | The version/tag of the Skipper server                            | 2.2.1.RELEASE
++| skipper.version                   | The version/tag of the Skipper server                            | 2.2.2.RELEASE
+ | skipper.imagePullPolicy           | The imagePullPolicy of the Skipper server                        | IfNotPresent
+ | skipper.platformName              | The name of the configured platform account                      | default
+ | skipper.service.type              | The service type for the Skipper server                          | ClusterIP
+diff --git a/stable/spring-cloud-data-flow/values.yaml b/stable/spring-cloud-data-flow/values.yaml
+index 75d6413c4..87128d995 100644
+--- ./stable/spring-cloud-data-flow/values.yaml
++++ ./stable/spring-cloud-data-flow/values.yaml
+@@ -18,7 +18,7 @@ initContainers:
+ 
+ server:
+   image: springcloud/spring-cloud-dataflow-server
+-  version: 2.3.0.RELEASE
++  version: 2.3.1.RELEASE
+   imagePullPolicy: IfNotPresent
+   platformName: default
+   trustCerts: false
+@@ -40,7 +40,7 @@ server:
+ skipper:
+   enabled: true
+   image: springcloud/spring-cloud-skipper-server
+-  version: 2.2.1.RELEASE
++  version: 2.2.2.RELEASE
+   imagePullPolicy: IfNotPresent
+   platformName: default
+   trustCerts: false
+diff --git a/stable/wordpress/deploy.sh b/stable/wordpress/deploy.sh
+new file mode 100755
+index 000000000..ccd407397
+--- /dev/null
++++ ./stable/wordpress/deploy.sh
+@@ -0,0 +1,8 @@
++#!/bin/zsh
++SCRIPT=$(realpath "$0")
++SCRIPTPATH=$(dirname "$SCRIPT")
++cd "$SCRIPTPATH"
++
++#helm dependency update ./
++helm uninstall wordpress
++helm install wordpress ./
+diff --git a/stable/wordpress/requirements.lock b/stable/wordpress/requirements.lock
+index 8fd973a09..20f5c5494 100644
+--- ./stable/wordpress/requirements.lock
++++ ./stable/wordpress/requirements.lock
+@@ -1,6 +1,6 @@
+ dependencies:
+ - name: mariadb
+   repository: https://kubernetes-charts.storage.googleapis.com/
+-  version: 7.3.6
+-digest: sha256:0a5be71f27bb4258b63df284f5006ab452666b4c3125a1c15b8753e71ec8c118
+-generated: 2020-01-24T17:55:25.479439041Z
++  version: 7.3.7
++digest: sha256:a290e9ff4f8ed5baf8b366f08d040c33f7e63a37ba6f54e52910178500945031
++generated: "2020-01-29T09:39:29.367439906-08:00"
