@@ -1256,19 +1256,6 @@ index 2ccb1a786..0f82cb4c6 100644
  description: A simple, powerful publishing platform that allows you to share your stories with the world
  keywords:
  - ghost
-diff --git a/stable/ghost/requirements.lock b/stable/ghost/requirements.lock
-index 6c26845a4..6cc4829dd 100644
---- ./stable/ghost/requirements.lock
-+++ ./stable/ghost/requirements.lock
-@@ -1,6 +1,6 @@
- dependencies:
- - name: mariadb
-   repository: https://kubernetes-charts.storage.googleapis.com/
--  version: 7.3.5
-+  version: 7.3.6
- digest: sha256:27bef733eb099a7377055cfe2c48e013bd4d55650ff18b50138c80488c812b0b
--generated: 2020-01-23T20:32:25.822558509Z
-+generated: 2020-01-29T06:22:52.921218702Z
 diff --git a/stable/ghost/values.yaml b/stable/ghost/values.yaml
 index 15f801f50..773269d6b 100644
 --- ./stable/ghost/values.yaml
@@ -2225,17 +2212,3 @@ index 75d6413c4..87128d995 100644
    imagePullPolicy: IfNotPresent
    platformName: default
    trustCerts: false
-diff --git a/stable/wordpress/requirements.lock b/stable/wordpress/requirements.lock
-index 8fd973a09..20f5c5494 100644
---- ./stable/wordpress/requirements.lock
-+++ ./stable/wordpress/requirements.lock
-@@ -1,6 +1,6 @@
- dependencies:
- - name: mariadb
-   repository: https://kubernetes-charts.storage.googleapis.com/
--  version: 7.3.6
--digest: sha256:0a5be71f27bb4258b63df284f5006ab452666b4c3125a1c15b8753e71ec8c118
--generated: 2020-01-24T17:55:25.479439041Z
-+  version: 7.3.7
-+digest: sha256:a290e9ff4f8ed5baf8b366f08d040c33f7e63a37ba6f54e52910178500945031
-+generated: "2020-01-29T09:39:29.367439906-08:00"
