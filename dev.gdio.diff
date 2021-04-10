@@ -1408,18 +1408,6 @@ index f7e997418..38c4456a2 100644
  description: Fast, reliable, scalable, and easy to use open-source relational database system. MariaDB Server is intended for mission-critical, heavy-load production systems as well as for embedding into mass-deployed software. Highly available MariaDB cluster.
  keywords:
    - mariadb
-diff --git a/stable/mariadb/deploy.sh b/stable/mariadb/deploy.sh
-new file mode 100755
-index 000000000..24d59eb1c
---- /dev/null
-+++ ./stable/mariadb/deploy.sh
-@@ -0,0 +1,6 @@
-+#!/bin/zsh
-+SCRIPT=$(realpath "$0")
-+SCRIPTPATH=$(dirname "$SCRIPT")
-+cd "$SCRIPTPATH"
-+
-+helm install mariadb ./
 diff --git a/stable/mariadb/values-production.yaml b/stable/mariadb/values-production.yaml
 index 49b0df5db..df9da5b08 100644
 --- ./stable/mariadb/values-production.yaml
@@ -1586,18 +1574,6 @@ index c46f145ab..6d0478e0a 100644
  | `imagePullSecrets`             | Specify image pull secrets                                                                                      | `nil` (does not add image pull secrets to deployed pods) |
  | `image.repository`             | The image repository to pull from                                                                               | `quay.io/kubernetes_incubator/nfs-provisioner`           |
  | `image.tag`                    | The image tag to pull from                                                                                      | `v2.2.2`                                                 |
-diff --git a/stable/nfs-server-provisioner/deploy.sh b/stable/nfs-server-provisioner/deploy.sh
-new file mode 100755
-index 000000000..e8ab19186
---- /dev/null
-+++ ./stable/nfs-server-provisioner/deploy.sh
-@@ -0,0 +1,6 @@
-+#!/bin/zsh
-+SCRIPT=$(realpath "$0")
-+SCRIPTPATH=$(dirname "$SCRIPT")
-+cd "$SCRIPTPATH"
-+
-+helm install nfs-server-provisioner ./ --set persistence.enabled=true,persistence.size=10Gi
 diff --git a/stable/nfs-server-provisioner/templates/statefulset.yaml b/stable/nfs-server-provisioner/templates/statefulset.yaml
 index 619b258b0..a872ca78c 100644
 --- ./stable/nfs-server-provisioner/templates/statefulset.yaml
@@ -2249,20 +2225,6 @@ index 75d6413c4..87128d995 100644
    imagePullPolicy: IfNotPresent
    platformName: default
    trustCerts: false
-diff --git a/stable/wordpress/deploy.sh b/stable/wordpress/deploy.sh
-new file mode 100755
-index 000000000..ccd407397
---- /dev/null
-+++ ./stable/wordpress/deploy.sh
-@@ -0,0 +1,8 @@
-+#!/bin/zsh
-+SCRIPT=$(realpath "$0")
-+SCRIPTPATH=$(dirname "$SCRIPT")
-+cd "$SCRIPTPATH"
-+
-+#helm dependency update ./
-+helm uninstall wordpress
-+helm install wordpress ./
 diff --git a/stable/wordpress/requirements.lock b/stable/wordpress/requirements.lock
 index 8fd973a09..20f5c5494 100644
 --- ./stable/wordpress/requirements.lock
