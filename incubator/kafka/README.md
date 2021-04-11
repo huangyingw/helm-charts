@@ -1,8 +1,17 @@
+# ⚠️ Repo Archive Notice
+
+As of Nov 13, 2020, charts in this repo will no longer be updated.
+For more information, see the Helm Charts [Deprecation and Archive Notice](https://github.com/helm/charts#%EF%B8%8F-deprecation-and-archive-notice), and [Update](https://helm.sh/blog/charts-repo-deprecation/).
+
 # Apache Kafka Helm Chart
 
 This is an implementation of Kafka StatefulSet found here:
 
  * https://github.com/Yolean/kubernetes-kafka
+
+## DEPRECATION NOTICE
+
+This chart is deprecated and no longer supported.
 
 ## Pre Requisites:
 
@@ -82,6 +91,7 @@ following configurable parameters:
 | `external.type`                                       | Service Type.                                                                                                                                                            | `NodePort`                                                         |
 | `external.distinct`                                   | Distinct DNS entries for each created A record.                                                                                                                          | `false`                                                            |
 | `external.annotations`                                | Additional annotations for the external service.                                                                                                                         | `{}`                                                               |
+| `external.labels`                                     | Additional labels for the external service.                                                                                                                              | `{}`                                                               |
 | `external.loadBalancerIP`                             | Add Static IP to the type Load Balancer. Depends on the provider if enabled                | `[]`
 | `external.loadBalancerSourceRanges`                   | Add IP ranges that are allowed to access the Load Balancer.                                | `[]`
 | `podAnnotations`                                      | Annotation to be added to Kafka pods                                                                                                                                     | `{}`                                                               |
@@ -136,6 +146,7 @@ following configurable parameters:
 | `prometheus.operator.prometheusRule.rules`            | Define the prometheus rules. See values file for examples                                                                                                                | `{}`                                                               |
 | `configJob.backoffLimit`                              | Number of retries before considering kafka-config job as failed                                                                                                          | `6`                                                                |
 | `topics`                                              | List of topics to create & configure. Can specify name, partitions, replicationFactor, reassignPartitions, config. See values.yaml                                       | `[]` (Empty list)                                                  |
+| `testsEnabled`                                        | Enable/disable the chart's tests                                                                                                                                         | `true`                                                             |
 | `zookeeper.enabled`                                   | If True, installs Zookeeper Chart                                                                                                                                        | `true`                                                             |
 | `zookeeper.resources`                                 | Zookeeper resource requests and limits                                                                                                                                   | `{}`                                                               |
 | `zookeeper.env`                                       | Environmental variables provided to Zookeeper Zookeeper                                                                                                                  | `{ZK_HEAP_SIZE: "1G"}`                                             |

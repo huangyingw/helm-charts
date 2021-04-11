@@ -1,5 +1,14 @@
+# ⚠️ Repo Archive Notice
+
+As of Nov 13, 2020, charts in this repo will no longer be updated.
+For more information, see the Helm Charts [Deprecation and Archive Notice](https://github.com/helm/charts#%EF%B8%8F-deprecation-and-archive-notice), and [Update](https://helm.sh/blog/charts-repo-deprecation/).
+
 # Helm chart for OpenVPN
 This chart will install an [OpenVPN](https://openvpn.net/) server inside a kubernetes cluster.  New certificates are generated on install, and a script is provided to generate client keys as needed.  The chart will automatically configure dns to use kube-dns and route all network traffic to kubernetes pods and services through the vpn.  By connecting to this vpn a host is effectively inside a cluster's network.
+
+## DEPRECATION NOTICE
+
+This chart is deprecated and no longer supported.
 
 ### Uses
 The primary purpose of this chart was to make it easy to access kubernetes services during development.  It could also be used for any service that only needs to be accessed through a vpn or as a standard vpn.
@@ -75,6 +84,7 @@ Parameter | Description | Default
 `image.repository`                   | `openvpn` image repository                                           | `jfelten/openvpn-docker`
 `image.tag`                          | `openvpn` image tag                                                  | `1.1.0`
 `image.pullPolicy`                   | Image pull policy                                                    | `IfNotPresent`
+`imagePullSecretName`                | Docker registry pull secret name                                     |
 `service.type`                       | k8s service type exposing ports, e.g. `NodePort`                     | `LoadBalancer`
 `service.externalPort`               | TCP port reported when creating configuration files                  | `443`
 `service.internalPort`               | TCP port on which the service works                                  | `443`
@@ -188,7 +198,7 @@ If routes look correct on the client but data is not returning from the vpn then
 
 Recent Ubuntu releases use systemd-resolved for DNS which by default [won't honor/apply DNS settings from openvpn](https://askubuntu.com/questions/1032476/ubuntu-18-04-no-dns-resolution-when-connected-to-openvpn).
 
-Install the update-systemd-resolved package (`apt install update-systemd-resolved`) and add the following settings to the client ovpn file.
+Install the openvpn-systemd-resolved package (`apt install openvpn-systemd-resolved`) and add the following settings to the client ovpn file.
 
 ```
 script-security 2
@@ -196,6 +206,7 @@ up /etc/openvpn/update-systemd-resolved
 up-restart
 down /etc/openvpn/update-systemd-resolved
 down-pre
+dhcp-option DOMAIN-ROUTE .
 ```
 
 If all of your clients are Ubuntu you can set the `openvpn.clientConf` value when deploying this chart to have these lines added to all generated client ovpn files:
